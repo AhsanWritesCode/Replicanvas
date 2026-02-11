@@ -1,0 +1,68 @@
+# OS / System files
+.DS_Store
+Thumbs.db
+
+
+# VSCode
+.vscode/
+!.vscode/extensions.json
+
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+
+# Go backend
+
+# Build output
+/bin/
+/build/
+/dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binaries
+*.test
+
+# Coverage files
+*.out
+coverage.out
+
+# Vendor directory (if not committing dependencies)
+vendor/
+
+# Go workspace
+go.work
+go.work.sum
+
+
+# React
+node_modules/
+dist/
+build/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Vite cache
+.vite/
+
+# TypeScript
+*.tsbuildinfo
+
+
+# Docker (if used)
+*.log
+docker-compose.override.yml
+
+# Misc
+*.swp
+*.swo
