@@ -1,3 +1,27 @@
+/**
+Toolbar Component
+Provides user controls for canvas interaction including drawing mode selection, brush size adjustment, and color selection.
+ 
+Modes:
+ - 'pixel': Places a single pixel on click/drag
+ - 'brush': Places multiple pixels in a square pattern on click/drag
+ 
+Brush Size:
+ - Controls the width/height of the square brush pattern (1-10 pixels)
+ - Only visible when mode is set to 'brush'
+  
+COLORS constant:
+ - Predefined palette of 12 hex color codes available for pixels
+
+Props:
+ @param {string} selectedColor - Currently selected hex color code
+ @param {function} onColorChange - Callback to update selected color
+ @param {string} mode - Current drawing mode ('pixel' or 'brush')
+ @param {function} onModeChange - Callback to toggle between pixel and brush modes
+ @param {number} brushSize - Current brush size (1-10)
+ @param {function} onBrushSizeChange - Callback to adjust brush size
+*/
+
 import React from 'react';
 import './Toolbar.css';
 
