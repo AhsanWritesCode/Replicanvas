@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './App.css';
 import Toolbar from './components/Toolbar';
 import Canvas from './components/Canvas';
 import HUD from './components/HUD';
+import canvasService from './services/canvasService';
 
 function App() {
   const [selectedColor, setSelectedColor] = useState('#FF0000');
@@ -10,7 +11,36 @@ function App() {
   const [brushSize, setBrushSize] = useState(3);
   const [cursorX, setCursorX] = useState(null);
   const [cursorY, setCursorY] = useState(null);
+  // Snapshot from the HTTP endpoint used to seed the canvas state.
+  const [initialCanvasState, setInitialCanvasState] = useState(null);
+  // Track whether the WebSocket is connected
+  const [wsConnected, setWsConnected] = useState(false);
 
+  // Initialize WebSocket connection and fetch initial snapshot on mount
+  useEffect(() => {
+    const initializeConnection = async () => {
+      try {
+        // Fetch the initial canvas snapshot
+        const snapshot = await canvasService.getSnapshot();
+        setInitialCanvasState(snapshot);
+
+        // Initialize the WebSocket connection
+        await canvasService.connectWebSocket();
+        setWsConnected(true);
+      } catch (error) {
+        console.error('Failed to initialize canvas connection:', error);
+      }
+    };
+
+    initializeConnection(); // Call the async initialization function
+
+    // Cleanup on unmount
+    return () => {
+      canvasService.disconnect();
+    };
+  }, []);
+
+  // Update HUD cursor position as the mouse moves over the canvas.
   const handleCoordinateChange = (x, y) => {
     setCursorX(x);
     setCursorY(y);
@@ -36,6 +66,9 @@ function App() {
         mode={mode}
         brushSize={brushSize}
         onCoordinateChange={handleCoordinateChange}
+        initialCanvasState={initialCanvasState}
+        canvasService={canvasService}
+        wsConnected={wsConnected}
       />
       
       <HUD x={cursorX} y={cursorY} />
