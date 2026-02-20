@@ -100,6 +100,6 @@ class CanvasService {
 }
 
 // Export a singleton instance
-// This allows us to use the same CanvasService instance across the entire app, maintaining a single WebSocket connection and shared state.
+// This allows us to use the same CanvasService instance across the entire app, maintaining a shared state.
 // Learned about singleton pattern from https://refactoring.guru/design-patterns/singleton
 export default new CanvasService();
