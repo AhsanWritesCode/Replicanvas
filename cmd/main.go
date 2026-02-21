@@ -20,6 +20,9 @@ func main() {
 	http.HandleFunc("/snapshot", httpHandler.GetSnapshot)
 	http.HandleFunc("/ws", wsHandler.HandleWS)
 
+	// Handle the status endpoint for load balancing
+	http.HandleFunc("/status", wsHandler.ClientCount)
+
 	log.Println("Server running on port 8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }

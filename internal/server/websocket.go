@@ -25,10 +25,10 @@ type PixelUpdate struct {
 }
 
 // This is the WebSocket handler struct
-// It contains the canvas, a mutex to synchronize access to the clients map, and a map of connected clients
+// It contains the canvas, a RWMutex to synchronize access to the clients map, and a map of connected clients
 type WSHandler struct {
 	canvas  *canvas.Canvas
-	mu      sync.Mutex
+	mu      sync.RWMutex
 	clients map[*websocket.Conn]bool
 }
 
@@ -107,4 +107,21 @@ func (ws *WSHandler) broadcast(msg []byte) {
 			delete(ws.clients, conn)
 		}
 	}
+}
+
+// Response for the /status endpoint
+type StatusResponse struct {
+	Connections int `json:"connections"`
+}
+
+// Returns the number of connected clients as JSON
+// we use RLock here so reads don't block the writers
+func (ws *WSHandler) ClientCount(w http.ResponseWriter, r *http.Request) {
+	ws.mu.RLock()
+	count := len(ws.clients)
+	ws.mu.RUnlock()
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	json.NewEncoder(w).Encode(StatusResponse{Connections: count})
 }
