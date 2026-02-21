@@ -121,9 +121,10 @@ const Canvas = ({ selectedColor, mode, brushSize, onCoordinateChange, initialCan
     } 
     // Brush mode: place NxN square of pixels centered at cursor.
     else if (mode === 'brush') {
-      const radius = Math.floor(brushSize / 2);
-      for (let dy = -radius; dy <= radius; dy++) {
-        for (let dx = -radius; dx <= radius; dx++) {
+      const start = -Math.floor(brushSize / 2);
+      const end = start + brushSize - 1;
+      for (let dy = start; dy <= end; dy++) {
+        for (let dx = start; dx <= end; dx++) {
           const nx = x + dx;
           const ny = y + dy;
           // Only draw pixels within canvas bounds.
