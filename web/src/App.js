@@ -20,12 +20,15 @@ function App() {
   useEffect(() => {
     const initializeConnection = async () => {
       try {
-        // Fetch the initial canvas snapshot
-        const snapshot = await canvasService.getSnapshot();
+        // pick the least-loaded server
+        const replica = await canvasService.selectBestReplica();
+
+        // fetch the initial canvas snapshot from that server
+        const snapshot = await canvasService.getSnapshot(replica.http);
         setInitialCanvasState(snapshot);
 
-        // Initialize the WebSocket connection
-        await canvasService.connectWebSocket();
+        // connect to its WebSocket
+        await canvasService.connectWebSocket(replica.ws);
         setWsConnected(true);
       } catch (error) {
         console.error('Failed to initialize canvas connection:', error);
@@ -51,7 +54,7 @@ function App() {
       <header className="app-header">
         <h1>Replicanvas</h1>
       </header>
-      
+
       <Toolbar
         selectedColor={selectedColor}
         onColorChange={setSelectedColor}
@@ -60,7 +63,7 @@ function App() {
         brushSize={brushSize}
         onBrushSizeChange={setBrushSize}
       />
-      
+
       <Canvas
         selectedColor={selectedColor}
         mode={mode}
@@ -70,7 +73,7 @@ function App() {
         canvasService={canvasService}
         wsConnected={wsConnected}
       />
-      
+
       <HUD x={cursorX} y={cursorY} />
     </div>
   );
