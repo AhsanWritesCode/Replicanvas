@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/AhsanWritesCode/559-project/internal/canvas"
 	"github.com/AhsanWritesCode/559-project/internal/replication"
@@ -64,8 +65,8 @@ func NewWSHandler(canvas *canvas.Canvas, repl *replication.Replicator) *WSHandle
 		canvas:     canvas,
 		clients:    make(map[*websocket.Conn]bool),
 		replicator: repl,
-		nodeID:     mustIntEnv("NODE_ID", 1),
-		leaderID:   mustIntEnv("LEADER_ID", 1),
+		nodeID:     MustIntEnv("NODE_ID", 1),
+		leaderID:   MustIntEnv("LEADER_ID", 1),
 	}
 }
 
@@ -169,8 +170,8 @@ func (ws *WSHandler) SetReplicator(r *replication.Replicator) {
 	ws.replicator = r
 }
 
-// Got it from like a tutorial. Will find links later,
-func mustIntEnv(key string, def int) int {
+// Got it from like a tutorial. Will find links later.
+func MustIntEnv(key string, def int) int {
 	v := os.Getenv(key)
 	if v == "" {
 		return def
@@ -180,4 +181,19 @@ func mustIntEnv(key string, def int) int {
 		return def
 	}
 	return n
+}
+
+// Adapted the one from above a bit.
+// Citations:
+// - I learnt about tickers here: https://dev.to/ankitmalikg/go-ticker-vs-timer-4glb
+func MustDurationEnvMs(key string, defMs int) time.Duration {
+	v := os.Getenv(key)
+	if v == "" {
+		return time.Duration(defMs) * time.Millisecond
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil {
+		return time.Duration(defMs) * time.Millisecond
+	}
+	return time.Duration(n) * time.Millisecond
 }
