@@ -146,7 +146,7 @@ func (r *Replicator) HandleReplicatePixel(w http.ResponseWriter, req *http.Reque
 		return
 	}
 
-	// Broadcast to local clients (once I figure out the web part. THis should be a TODO)
+	// Broadcast to local clients
 	if r.broadcaster != nil {
 		raw, _ := json.Marshal(upd)
 		r.broadcaster.BroadcastRaw(raw)

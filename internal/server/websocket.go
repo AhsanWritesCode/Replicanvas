@@ -70,7 +70,15 @@ func NewWSHandler(canvas *canvas.Canvas, repl *replication.Replicator) *WSHandle
 	}
 }
 
-// Broadcaster that broadcasts messages to followers.
+/*
+This is a Broadcaster interface.
+
+Inputs:
+- msg: a byte message that needs to be sent to all other users
+
+Functions:
+- It allows other packages can use broadcasting from outside the server package.
+*/
 func (ws *WSHandler) BroadcastRaw(msg []byte) {
 	ws.broadcast(msg)
 }
@@ -156,6 +164,20 @@ func (ws *WSHandler) broadcast(msg []byte) {
 			delete(ws.clients, conn)
 		}
 	}
+}
+
+/*
+*
+This sets the Replicator for the WSHandler.
+
+Inputs:
+- r: a pointer to a Replicator that handles replication to peers
+
+Functions:
+- Establishes the connection between WebSocket events and replication logic
+*/
+func (ws *WSHandler) SetReplicator(r *replication.Replicator) {
+	ws.replicator = r
 }
 
 // Got it from like a tutorial. Will find links later,

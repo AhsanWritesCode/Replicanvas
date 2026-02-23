@@ -21,7 +21,7 @@ func main() {
 
 	wsHandler = server.NewWSHandler(canvas, nil)
 	repl = replication.NewReplicator(canvas, os.Getenv("PEERS"), wsHandler)
-	wsHandler = server.NewWSHandler(canvas, repl)
+	wsHandler.SetReplicator(repl)
 
 	// Handle the HTTP requests, WebSocket connections, and replication
 	http.HandleFunc("/snapshot", httpHandler.GetSnapshot)
