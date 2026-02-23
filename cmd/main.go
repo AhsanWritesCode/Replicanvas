@@ -20,13 +20,13 @@ func main() {
 	var repl *replication.Replicator
 
 	wsHandler = server.NewWSHandler(canvas, nil)
-	repl = replication.NewReplicator(canvas, os.Getenv("PEERS"), wsHandler)
+	repl = replication.NewReplicator(canvas, os.Getenv("PEERS"), os.Getenv("LEADER_ADDR"), wsHandler)
 	wsHandler.SetReplicator(repl)
 
 	// Handle the HTTP requests, WebSocket connections, and replication
 	http.HandleFunc("/snapshot", httpHandler.GetSnapshot)
 	http.HandleFunc("/ws", wsHandler.HandleWS)
-
+	http.HandleFunc("/internal/forward/pixel", repl.HandleForwardPixel)
 	http.HandleFunc("/internal/replicate/pixel", repl.HandleReplicatePixel)
 
 	port := os.Getenv("PORT")

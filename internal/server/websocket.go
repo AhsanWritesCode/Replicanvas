@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"log"
 	"net/http"
 	"os"
@@ -115,40 +114,30 @@ func (ws *WSHandler) HandleWS(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	//main loop to handle the websocket connection
-	//read message from the clients and apply the pixel update to the canvas and broadcast the update to all connected clients
+	//read message from the clients and apply the pixel update to the canvas and broadcast
+	// the update to all connected clients
 	for {
 		_, msg, err := conn.ReadMessage()
 		if err != nil {
 			break
 		}
 
-		//unmarshal the message into the PixelUpdate struct
-		//if the message is invalid, log the error and continue
-		var update PixelUpdate
-		if err := json.Unmarshal(msg, &update); err != nil {
-			log.Println("Invalid message:", err)
-			continue
-		}
-
-		// Apply the pixel update to the canvas
-		if !ws.canvas.SetPixel(update.X, update.Y, update.Color) {
-			log.Printf("Out of bounds: (%d, %d)", update.X, update.Y)
-			continue
-		}
-
-		// TODO: Change this so that it sends a mesage to the leader
+		// follower: forward only
 		if ws.nodeID != ws.leaderID {
-			log.Printf("Reject write on follower node %d (leader is %d)", ws.nodeID, ws.leaderID)
+			if ws.replicator != nil {
+				if err := ws.replicator.ForwardToLeader(msg); err != nil {
+					log.Println("forward to leader failed:", err)
+				}
+			}
 			continue
 		}
 
-		// Replicate to PEERS. THIS SHOULD ONLY BE FOR THE LEADER,
+		// leader: commit using shared function
 		if ws.replicator != nil {
-			ws.replicator.ReplicateToPeers(msg)
+			if err := ws.replicator.CommitPixelRaw(msg); err != nil {
+				log.Println("commit failed:", err)
+			}
 		}
-
-		// Broadcast to all connected clients
-		ws.broadcast(msg)
 	}
 }
 

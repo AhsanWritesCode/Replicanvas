@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"strings"
@@ -32,19 +34,22 @@ COntains:
 - peers: a list of other servers to send replicas to
 - httpClient: connection I will use to send requests/messages to peers
 - broadcaster: to notify local WS clients. May include if necessary
+- leaderAddr: string linking the follower nodes to the leader
 */
 type Replicator struct {
 	canvas      *canvas.Canvas
 	peers       []string
 	httpClient  *http.Client
 	broadcaster Broadcaster
+	leaderAddr  string
 }
 
 /*
 THis is a new replicator struct
 - c: pointer to shared canvas
 - peersCSV: comma-separated list of peer addresses
-- b: optional broadcaster for local WebSocket clients
+- b: broadcaster for local WebSocket clients
+- leaderAddr: address for leader
 
 Functions:
 - It gets the peer addresses.
@@ -53,7 +58,7 @@ Functions:
 
 Returns a new functioning replicator
 */
-func NewReplicator(c *canvas.Canvas, peersCSV string, b Broadcaster) *Replicator {
+func NewReplicator(c *canvas.Canvas, peersCSV string, leaderAddr string, b Broadcaster) *Replicator {
 	peers := []string{}
 	for _, p := range strings.Split(peersCSV, ",") {
 		p = strings.TrimSpace(p)
@@ -68,6 +73,7 @@ func NewReplicator(c *canvas.Canvas, peersCSV string, b Broadcaster) *Replicator
 			Timeout: 800 * time.Millisecond,
 		},
 		broadcaster: b,
+		leaderAddr:  strings.TrimSpace(leaderAddr),
 	}
 }
 
@@ -79,7 +85,7 @@ Functions:
 - It loops over all peer servers
 - It sends each peer a POST request with the raw pixel update
 - It uses goroutines for replication ("best effort" so leader isn't blocked forever)
-  - Uses timeout to avoid blocking leader forever
+- Uses timeout to avoid blocking leader forever
 
 - It logs errors but does not crash if a peer is unreachable
 
@@ -112,7 +118,59 @@ func (r *Replicator) ReplicateToPeers(rawMsg []byte) {
 	}
 }
 
-// Follower endpoint: POST /internal/replicate/pixel
+/*
+This is a function to forward pixel updates to the leader.
+
+Inputs:
+- rawMsg: pixel update in JSON
+
+Functions:
+- It sends an HTTP POST request to the leader's /internal/forward/pixel endpoint
+- Uses a timeout context to avoid hanging requests
+- Returns an error if the request fails or if the leader responds with a non-2xx status
+- Does nothing if no leader is set i.e. that node is the leader.
+*/
+func (r *Replicator) ForwardToLeader(rawMsg []byte) error {
+	if r.leaderAddr == "" {
+		return nil // do nothing
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 800*time.Millisecond)
+	defer cancel()
+
+	url := "http://" + r.leaderAddr + "/internal/forward/pixel"
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(rawMsg))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := r.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	_ = resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return &httpError{status: resp.Status}
+	}
+	return nil
+}
+
+/*
+Represents an HTTP error returned from a request that failed.
+
+Fields:
+- status: the HTTP response status string
+
+Functions:
+  - Implements the error interface so HTTP failures can be returned and handled like regular
+    Go errors
+*/
+type httpError struct{ status string }
+
+func (e *httpError) Error() string { return e.status }
+
 /*
 THis is a follower endpoint,
 - HTTP POST endpoint at /internal/replicate/pixel
@@ -153,4 +211,77 @@ func (r *Replicator) HandleReplicatePixel(w http.ResponseWriter, req *http.Reque
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+/*
+This is a leader endpoint.
+This handles incoming pixel updates from clients on the leader.
+
+Inputs:
+- w: HTTP response writer
+- req: HTTP request containing the pixel update in JSON
+
+Functions:
+- Checks that the request method is POST
+- Decodes the JSON into a PixelUpdate
+- Applies the pixel change to the local canvas
+- Replicates the update to all follower peers
+- Broadcasts the update to the leader's local WebSocket clients
+- Returns HTTP 200 OK if successful
+
+Purpose: allows leader to send updates to followers
+*/
+func (r *Replicator) HandleForwardPixel(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	defer req.Body.Close()
+
+	rawBytes, err := io.ReadAll(req.Body)
+	if err != nil {
+		http.Error(w, "bad body", http.StatusBadRequest)
+		return
+	}
+
+	if err := r.CommitPixelRaw(rawBytes); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+/*
+*
+This commits a pixel update to the local canvas and propagates it.
+Made it its own function so that I can use it if updates are send directly to the leader
+or if they are coming from a follower.
+
+Inputs:
+- msg: a JSON-encoded PixelUpdate as a byte slice
+
+Functions:
+- Decodes the JSON into a PixelUpdate struct
+- Applies the pixel change to the local canvas
+- Returns an HTTP-style error if the update is out of bounds
+- Replicates the update to all follower peers
+- Broadcasts the update to local WebSocket clients if a broadcaster is set
+- Returns nil if the update is successful
+*/
+func (r *Replicator) CommitPixelRaw(msg []byte) error {
+	var upd PixelUpdate
+	if err := json.Unmarshal(msg, &upd); err != nil {
+		return err
+	}
+	if ok := r.canvas.SetPixel(upd.X, upd.Y, upd.Color); !ok {
+		return fmt.Errorf("out of bounds")
+	}
+
+	// replicate to peers + broadcast to clients
+	r.ReplicateToPeers(msg)
+	if r.broadcaster != nil {
+		r.broadcaster.BroadcastRaw(msg)
+	}
+	return nil
 }
