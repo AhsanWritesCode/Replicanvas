@@ -3,8 +3,10 @@ package main
 import (
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/AhsanWritesCode/559-project/internal/canvas"
+	"github.com/AhsanWritesCode/559-project/internal/replication"
 	"github.com/AhsanWritesCode/559-project/internal/server"
 )
 
@@ -14,12 +16,24 @@ func main() {
 
 	//Create the HTTP and Websocket handlers here
 	httpHandler := server.NewHttpHandler(canvas)
-	wsHandler := server.NewWSHandler(canvas)
+	var wsHandler *server.WSHandler
+	var repl *replication.Replicator
 
-	// Handle the HTTP requests and WebSocket connections
+	wsHandler = server.NewWSHandler(canvas, nil)
+	repl = replication.NewReplicator(canvas, os.Getenv("PEERS"), wsHandler)
+	wsHandler = server.NewWSHandler(canvas, repl)
+
+	// Handle the HTTP requests, WebSocket connections, and replication
 	http.HandleFunc("/snapshot", httpHandler.GetSnapshot)
 	http.HandleFunc("/ws", wsHandler.HandleWS)
 
-	log.Println("Server running on port 8080")
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	http.HandleFunc("/internal/replicate/pixel", repl.HandleReplicatePixel)
+
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	log.Println("Server running on port", port)
+	log.Fatal(http.ListenAndServe(":"+port, nil))
 }
