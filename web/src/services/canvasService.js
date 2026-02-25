@@ -1,7 +1,15 @@
-// Server spins up on localhost:8080, and the WebSocket endpoint is at ws://localhost:8080/ws
+// build the replicas list from env var, default to just localhost:8080
+// follows the same REACT_APP_ env var pattern as the rest of the codebase
+// e.g. REACT_APP_REPLICAS=http://localhost:8080,http://localhost:8081,http://localhost:8082
 // Learned from https://developer.mozilla.org/en-US/docs/Web/API/WebSocket
-const API_BASE_URL = 'http://localhost:8080';
-const WS_URL = 'ws://localhost:8080/ws';
+const replicaUrls = (process.env.REACT_APP_REPLICAS || 'http://localhost:8080')
+  .split(',')
+  .map(u => u.trim());
+
+const REPLICAS = replicaUrls.map(http => ({
+  http,
+  ws: http.replace('http', 'ws') + '/ws'
+}));
 
 // CanvasService class to manage communication with the backend
 // Learnt about classes from https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/class
@@ -11,12 +19,50 @@ class CanvasService {
     this.messageHandlers = []; // Handlers to call when a WebSocket message is received
   }
 
+  // picks the replica with the fewest active connections
+  // if theres a tie, pick randomly from the tied ones
+  // learned about Promise.allSettled from https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/allSettled
+  async selectBestReplica() {
+    // fire GET /status on all replicas in parallel
+    const results = await Promise.allSettled(
+      REPLICAS.map(async (replica) => {
+        const response = await fetch(`${replica.http}/status`);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        return { replica, connections: data.connections };
+      })
+    );
+
+    // filter out replicas that didn't respond
+    const alive = results
+      .filter(r => r.status === 'fulfilled')
+      .map(r => r.value);
+
+    if (alive.length === 0) {
+      throw new Error('All replicas are unreachable');
+    }
+
+    // find the lowest connection count
+    const minCount = Math.min(...alive.map(r => r.connections));
+
+    // grab all replicas tied at the minimum
+    const tied = alive.filter(r => r.connections === minCount);
+
+    // random tiebreaker
+    const chosen = tied[Math.floor(Math.random() * tied.length)];
+
+    console.log(`Selected replica ${chosen.replica.http} (${chosen.connections} connections)`);
+    return chosen.replica;
+  }
+
   // Fetch the initial canvas snapshot from the HTTP endpoint
   // Learned about async/await and fetch API from https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/async_function 
   // and https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch
-  async getSnapshot() {
+  async getSnapshot(baseUrl) {
     try {
-      const response = await fetch(`${API_BASE_URL}/snapshot`); // Fetch API 
+      const response = await fetch(`${baseUrl}/snapshot`); // Fetch API 
       // Check if the response is OK (status in the range 200-299)
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -30,14 +76,14 @@ class CanvasService {
   }
 
   // Initialize WebSocket connection for real-time updates
-  connectWebSocket() {
+  connectWebSocket(wsUrl) {
     return new Promise((resolve, reject) => {
       try {
-        this.ws = new WebSocket(WS_URL); // Create a new WebSocket connection to the server
+        this.ws = new WebSocket(wsUrl); // connect to the selected server
 
         // If the connection is successful, log it and resolve the promise
         this.ws.onopen = () => {
-          console.log('WebSocket connected');
+          console.log('WebSocket connected to', wsUrl);
           resolve();
         };
 

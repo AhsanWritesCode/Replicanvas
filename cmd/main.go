@@ -19,6 +19,7 @@ func main() {
 	// Handle the HTTP requests and WebSocket connections
 	http.HandleFunc("/snapshot", httpHandler.GetSnapshot)
 	http.HandleFunc("/ws", wsHandler.HandleWS)
+	http.HandleFunc("/status", wsHandler.ClientCount) // for load balancing
 
 	log.Println("Server running on port 8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))

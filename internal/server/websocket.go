@@ -108,3 +108,19 @@ func (ws *WSHandler) broadcast(msg []byte) {
 		}
 	}
 }
+
+// response shape for the /status endpoint
+type StatusResponse struct {
+	Connections int `json:"connections"`
+}
+
+// returns the number of connected clients so the frontend can pick the least-loaded server
+func (ws *WSHandler) ClientCount(w http.ResponseWriter, r *http.Request) {
+	ws.mu.Lock()
+	count := len(ws.clients)
+	ws.mu.Unlock()
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	json.NewEncoder(w).Encode(StatusResponse{Connections: count})
+}
