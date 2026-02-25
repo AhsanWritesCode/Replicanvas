@@ -6,7 +6,8 @@ import (
 	"os"
 
 	"github.com/AhsanWritesCode/559-project/internal/canvas"
-	election "github.com/AhsanWritesCode/559-project/internal/elEction"
+	"github.com/AhsanWritesCode/559-project/internal/config"
+	"github.com/AhsanWritesCode/559-project/internal/election"
 	"github.com/AhsanWritesCode/559-project/internal/replication"
 	"github.com/AhsanWritesCode/559-project/internal/server"
 )
@@ -37,11 +38,11 @@ func main() {
 
 	// TODO: Properly implement this stuff later.
 	// FROM >>>>>>>>
-	nodeID := server.MustIntEnv("NODE_ID", 1)
-	leaderID := server.MustIntEnv("LEADER_ID", 1)
+	nodeID := config.MustIntEnv("NODE_ID", 1)
+	leaderID := config.MustIntEnv("LEADER_ID", 1)
 
-	hbInterval := server.MustDurationEnvMs("HB_INTERVAL_MS", 500)
-	hbTimeout := server.MustDurationEnvMs("HB_TIMEOUT_MS", 1500)
+	hbInterval := config.MustDurationEnvMs("HB_INTERVAL_MS", 500)
+	hbTimeout := config.MustDurationEnvMs("HB_TIMEOUT_MS", 1500)
 
 	hb := election.NewHeartbeats(nodeID, leaderID, os.Getenv("PEERS"), hbInterval, hbTimeout)
 

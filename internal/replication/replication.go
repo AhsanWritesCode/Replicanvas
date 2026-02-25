@@ -12,14 +12,8 @@ import (
 	"time"
 
 	"github.com/AhsanWritesCode/559-project/internal/canvas"
+	"github.com/AhsanWritesCode/559-project/internal/models"
 )
-
-// PixelUpdate matching the client WS payload
-type PixelUpdate struct {
-	X     int    `json:"x"`
-	Y     int    `json:"y"`
-	Color string `json:"color"`
-}
 
 // Broadcaster to allow Replication Notify Local WS Clients. I will figure this out once I can
 // figure out the web then I will actually start commenting this properly.
@@ -193,7 +187,7 @@ func (r *Replicator) HandleReplicatePixel(w http.ResponseWriter, req *http.Reque
 	defer req.Body.Close()
 
 	// We decode, then also re-encode to bytes for local WS broadcast.
-	var upd PixelUpdate
+	var upd models.PixelUpdate
 	if err := json.NewDecoder(req.Body).Decode(&upd); err != nil {
 		http.Error(w, "bad json", http.StatusBadRequest)
 		return
@@ -270,7 +264,7 @@ Functions:
 - Returns nil if the update is successful
 */
 func (r *Replicator) CommitPixelRaw(msg []byte) error {
-	var upd PixelUpdate
+	var upd models.PixelUpdate
 	if err := json.Unmarshal(msg, &upd); err != nil {
 		return err
 	}
