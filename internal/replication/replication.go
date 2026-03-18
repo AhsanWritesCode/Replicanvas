@@ -198,6 +198,8 @@ func (r *Replicator) HandleReplicatePixel(w http.ResponseWriter, req *http.Reque
 		return
 	}
 
+	log.Printf("[follower] applied replicated pixel x=%d y=%d color=%s", upd.X, upd.Y, upd.Color)
+
 	// Broadcast to local clients
 	if r.broadcaster != nil {
 		raw, _ := json.Marshal(upd)
@@ -271,6 +273,8 @@ func (r *Replicator) CommitPixelRaw(msg []byte) error {
 	if ok := r.canvas.SetPixel(upd.X, upd.Y, upd.Color); !ok {
 		return fmt.Errorf("out of bounds")
 	}
+
+	log.Printf("[leader] committed pixel x=%d y=%d color=%s — replicating to %d peers", upd.X, upd.Y, upd.Color, len(r.peers))
 
 	// replicate to peers + broadcast to clients
 	r.ReplicateToPeers(msg)
