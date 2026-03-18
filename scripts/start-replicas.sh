@@ -16,7 +16,7 @@ echo "Building server..."
 (cd "$ROOT" && go build -o "$BINARY" ./cmd/main.go)
 echo "Build complete."
 
-# Node 1 — Leader
+# Node 1: Leader
 NODE_ID=1 \
 LEADER_ID=1 \
 PORT=8080 \
@@ -26,7 +26,7 @@ LEADER_ADDR="localhost:8080" \
 echo $! > "$LOG_DIR/node1.pid"
 echo "Started Node 1 (leader) on :8080  [PID $(cat "$LOG_DIR/node1.pid")]"
 
-# Node 2 — Follower
+# Node 2: Follower
 NODE_ID=2 \
 LEADER_ID=1 \
 PORT=8081 \
@@ -36,7 +36,7 @@ LEADER_ADDR="localhost:8080" \
 echo $! > "$LOG_DIR/node2.pid"
 echo "Started Node 2 (follower) on :8081  [PID $(cat "$LOG_DIR/node2.pid")]"
 
-# Node 3 — Follower
+# Node 3: Follower
 NODE_ID=3 \
 LEADER_ID=1 \
 PORT=8082 \
