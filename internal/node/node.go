@@ -1,7 +1,6 @@
 package node
 
 import (
-	"net/http"
 	"strings"
 	"sync"
 	"time"
@@ -44,8 +43,6 @@ type Node struct {
 	leaderAlive   bool
 
 	broadcaster Broadcaster
-
-	httpClient *http.Client
 }
 
 /*
@@ -77,10 +74,6 @@ func NewNode(c *canvas.Canvas, nodeID, leaderID int, peersCSV, leaderAddr string
 		leaderAddr:    leaderAddr,
 		lastHeartbeat: time.Now(),
 		leaderAlive:   true,
-
-		httpClient: &http.Client{
-			Timeout: 800 * time.Millisecond,
-		},
 	}
 }
 

@@ -116,7 +116,7 @@ func (n *Node) sendHeartbeatToPeers() {
 			}
 			req.Header.Set("Content-Type", "application/json")
 
-			resp, err := n.httpClient.Do(req)
+			resp, err := http.DefaultClient.Do(req)
 			if err != nil {
 				// follower might be down. That is not the leaders problem.
 				return
@@ -151,7 +151,7 @@ func (n *Node) watchLoop(timeout time.Duration) {
 		if since > timeout && alive {
 			n.MarkLeaderDead()
 			log.Printf("heartbeat: leader %d missed for %v (timeout %v). Leader may be dead.",
-				n.leaderID, since.Truncate(time.Millisecond), timeout)
+				n.LeaderID(), since.Truncate(time.Millisecond), timeout)
 		}
 	}
 }
