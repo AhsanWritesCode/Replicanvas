@@ -1,12 +1,12 @@
 package server
 
 import (
-	"encoding/json"
 	"log"
 	"net/http"
 	"sync"
 
-	"github.com/AhsanWritesCode/559-project/internal/canvas"
+	"github.com/AhsanWritesCode/559-project/internal/node"
+	"github.com/AhsanWritesCode/559-project/internal/replication"
 	"github.com/gorilla/websocket"
 )
 
@@ -17,24 +17,54 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-// This is the message format between the server and the client for pixel updates
-type PixelUpdate struct {
-	X     int    `json:"x"`
-	Y     int    `json:"y"`
-	Color string `json:"color"`
-}
-
 // This is the WebSocket handler struct
 // It contains the canvas, a mutex to synchronize access to the clients map, and a map of connected clients
+/*
+- replicator: if it is the leader, this is how it communicates
+- nodeID: identification
+- leaderID: who does it think is the leader right now
+*/
 type WSHandler struct {
-	canvas  *canvas.Canvas
 	mu      sync.Mutex
 	clients map[*websocket.Conn]bool
+	node    *node.Node
 }
 
-// This function is used to create a new WebSocket handler for the canvas
-func NewWSHandler(canvas *canvas.Canvas) *WSHandler {
-	return &WSHandler{canvas: canvas, clients: make(map[*websocket.Conn]bool)}
+/*
+This is the WebSocket handler constructor
+
+Inputs:
+- canvas: shared canvas to read and update pixels
+- node instance
+
+Functions:
+- It creates a new WSHandler instance
+- Initializes clients map to track connected WebSocket clients
+- Stores the replicator so pixel updates can be sent to peers if needed
+- Reads NODE_ID and LEADER_ID from environment variables
+
+Purpose: sets up a WebSocket handler that can manage connected clients and optionally
+
+	replicate updates across nodes.
+*/
+func NewWSHandler(n *node.Node) *WSHandler {
+	return &WSHandler{
+		clients: make(map[*websocket.Conn]bool),
+		node:    n,
+	}
+}
+
+/*
+This is a Broadcaster interface.
+
+Inputs:
+- msg: a byte message that needs to be sent to all other users
+
+Functions:
+- It allows other packages can use broadcasting from outside the server package.
+*/
+func (ws *WSHandler) BroadcastRaw(msg []byte) {
+	ws.broadcast(msg)
 }
 
 // Function to handle the WebSocket connection
@@ -69,29 +99,26 @@ func (ws *WSHandler) HandleWS(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	//main loop to handle the websocket connection
-	//read message from the clients and apply the pixel update to the canvas and broadcast the update to all connected clients
+	//read message from the clients and apply the pixel update to the canvas and broadcast
+	// the update to all connected clients
 	for {
 		_, msg, err := conn.ReadMessage()
 		if err != nil {
 			break
 		}
 
-		//unmarshal the message into the PixelUpdate struct
-		//if the message is invalid, log the error and continue
-		var update PixelUpdate
-		if err := json.Unmarshal(msg, &update); err != nil {
-			log.Println("Invalid message:", err)
+		// follower: forward only
+		if !ws.node.IsLeader() {
+			if err := replication.ForwardToLeader(ws.node, msg); err != nil {
+				log.Println("forward to leader failed:", err)
+			}
 			continue
 		}
 
-		// Apply the pixel update to the canvas
-		if !ws.canvas.SetPixel(update.X, update.Y, update.Color) {
-			log.Printf("Out of bounds: (%d, %d)", update.X, update.Y)
-			continue
+		// leader: commit using shared function
+		if err := replication.CommitPixelRaw(ws.node, msg); err != nil {
+			log.Println("commit failed:", err)
 		}
-
-		// Broadcast to all connected clients
-		ws.broadcast(msg)
 	}
 }
 

@@ -1,7 +1,11 @@
 // Server spins up on localhost:8080, and the WebSocket endpoint is at ws://localhost:8080/ws
 // Learned from https://developer.mozilla.org/en-US/docs/Web/API/WebSocket
-const API_BASE_URL = 'http://localhost:8080';
-const WS_URL = 'ws://localhost:8080/ws';
+// const API_BASE_URL = 'http://localhost:8080';
+// const WS_URL = 'ws://localhost:8080/ws';
+
+// Changed the setup to allow myself to start creating replicas for testing.
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8080';
+const WS_URL = process.env.REACT_APP_WS_URL || 'ws://localhost:8080/ws';
 
 // CanvasService class to manage communication with the backend
 // Learnt about classes from https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/class
