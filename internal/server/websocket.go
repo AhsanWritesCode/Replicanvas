@@ -5,8 +5,7 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/AhsanWritesCode/559-project/internal/canvas"
-	"github.com/AhsanWritesCode/559-project/internal/config"
+	"github.com/AhsanWritesCode/559-project/internal/node"
 	"github.com/AhsanWritesCode/559-project/internal/replication"
 	"github.com/gorilla/websocket"
 )
@@ -26,12 +25,9 @@ var upgrader = websocket.Upgrader{
 - leaderID: who does it think is the leader right now
 */
 type WSHandler struct {
-	canvas     *canvas.Canvas
-	mu         sync.Mutex
-	clients    map[*websocket.Conn]bool
-	replicator *replication.Replicator
-	nodeID     int
-	leaderID   int
+	mu      sync.Mutex
+	clients map[*websocket.Conn]bool
+	node    *node.Node
 }
 
 /*
@@ -39,7 +35,7 @@ This is the WebSocket handler constructor
 
 Inputs:
 - canvas: shared canvas to read and update pixels
-- repl: optional Replicator to send updates to other servers (incase it is the leader)
+- node instance
 
 Functions:
 - It creates a new WSHandler instance
@@ -51,13 +47,10 @@ Purpose: sets up a WebSocket handler that can manage connected clients and optio
 
 	replicate updates across nodes.
 */
-func NewWSHandler(canvas *canvas.Canvas, repl *replication.Replicator) *WSHandler {
+func NewWSHandler(n *node.Node) *WSHandler {
 	return &WSHandler{
-		canvas:     canvas,
-		clients:    make(map[*websocket.Conn]bool),
-		replicator: repl,
-		nodeID:     config.MustIntEnv("NODE_ID", 1),
-		leaderID:   config.MustIntEnv("LEADER_ID", 1),
+		clients: make(map[*websocket.Conn]bool),
+		node:    n,
 	}
 }
 
@@ -115,20 +108,16 @@ func (ws *WSHandler) HandleWS(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// follower: forward only
-		if ws.nodeID != ws.leaderID {
-			if ws.replicator != nil {
-				if err := ws.replicator.ForwardToLeader(msg); err != nil {
-					log.Println("forward to leader failed:", err)
-				}
+		if !ws.node.IsLeader() {
+			if err := replication.ForwardToLeader(ws.node, msg); err != nil {
+				log.Println("forward to leader failed:", err)
 			}
 			continue
 		}
 
 		// leader: commit using shared function
-		if ws.replicator != nil {
-			if err := ws.replicator.CommitPixelRaw(msg); err != nil {
-				log.Println("commit failed:", err)
-			}
+		if err := replication.CommitPixelRaw(ws.node, msg); err != nil {
+			log.Println("commit failed:", err)
 		}
 	}
 }
@@ -145,18 +134,4 @@ func (ws *WSHandler) broadcast(msg []byte) {
 			delete(ws.clients, conn)
 		}
 	}
-}
-
-/*
-*
-This sets the Replicator for the WSHandler.
-
-Inputs:
-- r: a pointer to a Replicator that handles replication to peers
-
-Functions:
-- Establishes the connection between WebSocket events and replication logic
-*/
-func (ws *WSHandler) SetReplicator(r *replication.Replicator) {
-	ws.replicator = r
 }

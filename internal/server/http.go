@@ -4,17 +4,17 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/AhsanWritesCode/559-project/internal/canvas"
+	"github.com/AhsanWritesCode/559-project/internal/node"
 )
 
 // This struct is used to handle the HTTP requests and responses for the canvas
 type HttpHandler struct {
-	canvas *canvas.Canvas
+	node *node.Node
 }
 
 // This function is used to create a new HTTP handler for the canvas
-func NewHttpHandler(canvas *canvas.Canvas) *HttpHandler {
-	return &HttpHandler{canvas: canvas}
+func NewHttpHandler(node *node.Node) *HttpHandler {
+	return &HttpHandler{node: node}
 }
 
 // This struct is used to represent the response for the snapshot of the canvas (it will be sent to the client to be displayed on the canvas)
@@ -34,9 +34,9 @@ func (h *HttpHandler) GetSnapshot(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	response := SnapShotResponse{
-		Width:  h.canvas.Width,
-		Height: h.canvas.Height,
-		Pixels: h.canvas.Snapshot(),
+		Width:  h.node.Canvas.Width,
+		Height: h.node.Canvas.Height,
+		Pixels: h.node.Canvas.Snapshot(),
 	}
 	json.NewEncoder(w).Encode(response)
 }

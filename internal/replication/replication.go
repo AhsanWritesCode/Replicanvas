@@ -8,71 +8,15 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"strings"
 	"time"
 
-	"github.com/AhsanWritesCode/559-project/internal/canvas"
 	"github.com/AhsanWritesCode/559-project/internal/models"
+	"github.com/AhsanWritesCode/559-project/internal/node"
 )
-
-// Broadcaster to allow Replication Notify Local WS Clients. I will figure this out once I can
-// figure out the web then I will actually start commenting this properly.
-type Broadcaster interface {
-	BroadcastRaw(msg []byte)
-}
-
-/*
-THis is a Replicator Struct.
-COntains:
-- canvas: shared canvas state to update pixels locally
-- peers: a list of other servers to send replicas to
-- httpClient: connection I will use to send requests/messages to peers
-- broadcaster: to notify local WS clients. May include if necessary
-- leaderAddr: string linking the follower nodes to the leader
-*/
-type Replicator struct {
-	canvas      *canvas.Canvas
-	peers       []string
-	httpClient  *http.Client
-	broadcaster Broadcaster
-	leaderAddr  string
-}
-
-/*
-THis is a new replicator struct
-- c: pointer to shared canvas
-- peersCSV: comma-separated list of peer addresses
-- b: broadcaster for local WebSocket clients
-- leaderAddr: address for leader
-
-Functions:
-- It gets the peer addresses.
-- It creates httpClient with timeout
-- It stores broadcaster for optional local notifications
-
-Returns a new functioning replicator
-*/
-func NewReplicator(c *canvas.Canvas, peersCSV string, leaderAddr string, b Broadcaster) *Replicator {
-	peers := []string{}
-	for _, p := range strings.Split(peersCSV, ",") {
-		p = strings.TrimSpace(p)
-		if p != "" {
-			peers = append(peers, p)
-		}
-	}
-	return &Replicator{
-		canvas: c,
-		peers:  peers,
-		httpClient: &http.Client{
-			Timeout: 800 * time.Millisecond,
-		},
-		broadcaster: b,
-		leaderAddr:  strings.TrimSpace(leaderAddr),
-	}
-}
 
 /*
 This function is hwo the leader replicates to others after applying changes locally
+- Node: replica this is acting on
 - rawMsg: original JSON message from client
 
 Functions:
@@ -85,8 +29,10 @@ Functions:
 
 Leader uses this to push updates to all peer/follower servers
 */
-func (r *Replicator) ReplicateToPeers(rawMsg []byte) {
-	for _, peer := range r.peers {
+func ReplicateToPeers(n *node.Node, rawMsg []byte) {
+	peers := n.Peers()
+
+	for _, peer := range peers {
 		go func(peer string) {
 			ctx, cancel := context.WithTimeout(context.Background(), 800*time.Millisecond)
 			defer cancel()
@@ -99,7 +45,8 @@ func (r *Replicator) ReplicateToPeers(rawMsg []byte) {
 			}
 			req.Header.Set("Content-Type", "application/json")
 
-			resp, err := r.httpClient.Do(req)
+			// this is best effort for now. I will check and see if we make any guarantees later
+			resp, err := http.DefaultClient.Do(req)
 			if err != nil {
 				log.Println("replication: POST failed to", peer, ":", err)
 				return
@@ -117,6 +64,7 @@ This is a function to forward pixel updates to the leader.
 
 Inputs:
 - rawMsg: pixel update in JSON
+- Node: replica this is acting on
 
 Functions:
 - It sends an HTTP POST request to the leader's /internal/forward/pixel endpoint
@@ -124,22 +72,24 @@ Functions:
 - Returns an error if the request fails or if the leader responds with a non-2xx status
 - Does nothing if no leader is set i.e. that node is the leader.
 */
-func (r *Replicator) ForwardToLeader(rawMsg []byte) error {
-	if r.leaderAddr == "" {
+func ForwardToLeader(n *node.Node, rawMsg []byte) error {
+	leaderAddr := n.LeaderAddr()
+	if leaderAddr == "" {
 		return nil // do nothing
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 800*time.Millisecond)
 	defer cancel()
 
-	url := "http://" + r.leaderAddr + "/internal/forward/pixel"
+	url := "http://" + leaderAddr + "/internal/forward/pixel"
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(rawMsg))
 	if err != nil {
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := r.httpClient.Do(req)
+	// still best efforting a bit
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -168,6 +118,7 @@ func (e *httpError) Error() string { return e.status }
 /*
 THis is a follower endpoint,
 - HTTP POST endpoint at /internal/replicate/pixel
+- n: node instance for this replica
 
 Functions:
 - It checks request method is POST
@@ -178,7 +129,7 @@ Functions:
 
 Purpose: allows followers to receive replicated updates from the leader
 */
-func (r *Replicator) HandleReplicatePixel(w http.ResponseWriter, req *http.Request) {
+func HandleReplicatePixel(n *node.Node, w http.ResponseWriter, req *http.Request) {
 	if req.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -193,19 +144,16 @@ func (r *Replicator) HandleReplicatePixel(w http.ResponseWriter, req *http.Reque
 		return
 	}
 
-	if ok := r.canvas.SetPixel(upd.X, upd.Y, upd.Color); !ok {
+	if ok := n.Canvas.SetPixel(upd.X, upd.Y, upd.Color); !ok {
 		http.Error(w, "out of bounds", http.StatusBadRequest)
 		return
 	}
 
 	log.Printf("[follower] applied replicated pixel x=%d y=%d color=%s", upd.X, upd.Y, upd.Color)
 
-	// Broadcast to local clients
-	if r.broadcaster != nil {
-		raw, _ := json.Marshal(upd)
-		r.broadcaster.BroadcastRaw(raw)
-	}
-
+	// Tell node to broadcast to local clients
+	raw, _ := json.Marshal(upd)
+	n.BroadcastRaw(raw)
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -216,18 +164,18 @@ This handles incoming pixel updates from clients on the leader.
 Inputs:
 - w: HTTP response writer
 - req: HTTP request containing the pixel update in JSON
+- n: local instance of node
 
 Functions:
 - Checks that the request method is POST
 - Decodes the JSON into a PixelUpdate
 - Applies the pixel change to the local canvas
-- Replicates the update to all follower peers
-- Broadcasts the update to the leader's local WebSocket clients
+- Tells it to commit the pixels to followers
 - Returns HTTP 200 OK if successful
 
 Purpose: allows leader to send updates to followers
 */
-func (r *Replicator) HandleForwardPixel(w http.ResponseWriter, req *http.Request) {
+func HandleForwardPixel(n *node.Node, w http.ResponseWriter, req *http.Request) {
 	if req.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -240,7 +188,7 @@ func (r *Replicator) HandleForwardPixel(w http.ResponseWriter, req *http.Request
 		return
 	}
 
-	if err := r.CommitPixelRaw(rawBytes); err != nil {
+	if err := CommitPixelRaw(n, rawBytes); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -265,21 +213,19 @@ Functions:
 - Broadcasts the update to local WebSocket clients if a broadcaster is set
 - Returns nil if the update is successful
 */
-func (r *Replicator) CommitPixelRaw(msg []byte) error {
+func CommitPixelRaw(n *node.Node, msg []byte) error {
 	var upd models.PixelUpdate
 	if err := json.Unmarshal(msg, &upd); err != nil {
 		return err
 	}
-	if ok := r.canvas.SetPixel(upd.X, upd.Y, upd.Color); !ok {
+	if ok := n.Canvas.SetPixel(upd.X, upd.Y, upd.Color); !ok {
 		return fmt.Errorf("out of bounds")
 	}
 
-	log.Printf("[leader] committed pixel x=%d y=%d color=%s — replicating to %d peers", upd.X, upd.Y, upd.Color, len(r.peers))
+	log.Printf("[leader] committed pixel x=%d y=%d color=%s — replicating to %d peers", upd.X, upd.Y, upd.Color, len(n.Peers()))
 
 	// replicate to peers + broadcast to clients
-	r.ReplicateToPeers(msg)
-	if r.broadcaster != nil {
-		r.broadcaster.BroadcastRaw(msg)
-	}
+	ReplicateToPeers(n, msg)
+	n.BroadcastRaw(msg)
 	return nil
 }
