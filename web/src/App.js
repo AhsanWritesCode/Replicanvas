@@ -34,6 +34,20 @@ function App() {
 
     initializeConnection(); // Call the async initialization function
 
+    // Have to register the reconnect callback so the canvas re-fetches state from the new replica
+    // This is only triggered when auto reconnect is active (no ?server= param)
+    // Might remove this if we remove the 2 modes we have, else we'll just keep this
+    canvasService.onReconnect(async () => {
+      try {
+        const snapshot = await canvasService.getSnapshot();
+        setInitialCanvasState(snapshot);
+        setWsConnected(true);
+        console.log('Reconnected and refreshed canvas from new replica');
+      } catch (err) {
+        console.error('Failed to refresh canvas after reconnect:', err);
+      }
+    });
+
     // Cleanup on unmount
     return () => {
       canvasService.disconnect();

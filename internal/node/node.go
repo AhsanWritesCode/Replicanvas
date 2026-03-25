@@ -25,24 +25,32 @@ Inputs:
 - LeaderID: current leader’s ID
 - Peers: list of peer addresses
 - LeaderAddr: address of the leader
+- PeerInfos: list of peers with IDs and addresses (needed for elections to map ID → address)
+- SelfAddr: this node's own HTTP address (sent in leader announcements so followers know where to forward writes)
+- SnapshotTimestamp: Unix timestamp of last snapshot (used in Modified Bully to prefer nodes with recent data)
 - LastHeartbeat: last time a heartbeat was received
 - LeaderAlive: whether the leader is alive
-- HTTPClient: client used to send requests to peers
+- Election: election-specific state (in-progress flag, timeout)
 */
 type Node struct {
 	Canvas *canvas.Canvas
 
 	mu sync.RWMutex
 
-	nodeID   int
-	leaderID int
-	peers    []string
+	nodeID    int
+	leaderID  int
+	peers     []string
+	peerInfos []PeerInfo
 
-	leaderAddr    string
+	selfAddr          string
+	leaderAddr        string
+	snapshotTimestamp int64
+
 	lastHeartbeat time.Time
 	leaderAlive   bool
 
 	broadcaster Broadcaster
+	election    *ElectionState
 }
 
 /*
@@ -52,29 +60,43 @@ Inputs:
 - c: shared canvas state
 - nodeID: this node’s ID
 - leaderID: current leader’s ID
-- peersCSV: comma-separated list of peer addresses
+- peersCSV: comma-separated list of peer addresses in "id=address" format
+  (e.g. "1=localhost:8080,2=localhost:8081,3=localhost:8082")
+- selfAddr: this node’s own HTTP address
 - leaderAddr: address of the leader
+- electionTimeout: how long to wait for bully responses during an election
 */
-func NewNode(c *canvas.Canvas, nodeID, leaderID int, peersCSV, leaderAddr string) *Node {
-	peers := []string{}
-	for _, p := range strings.Split(peersCSV, ",") {
-		p = strings.TrimSpace(p)
-		if p != "" {
-			peers = append(peers, p)
+func NewNode(c *canvas.Canvas, nodeID, leaderID int, peersCSV, selfAddr, leaderAddr string, electionTimeout time.Duration) *Node {
+	peerInfos, peers := ParsePeersWithIDs(peersCSV)
+
+	// Fallback: if peers were provided without IDs (plain addresses), keep them as-is
+	if len(peerInfos) == 0 && len(peers) == 0 {
+		for _, p := range strings.Split(peersCSV, ",") {
+			p = strings.TrimSpace(p)
+			if p != "" {
+				peers = append(peers, p)
+			}
 		}
 	}
 
-	return &Node{
+	n := &Node{
 		Canvas: c,
 
-		nodeID:   nodeID,
-		leaderID: leaderID,
-		peers:    peers,
+		nodeID:    nodeID,
+		leaderID:  leaderID,
+		peers:     peers,
+		peerInfos: peerInfos,
 
-		leaderAddr:    leaderAddr,
+		selfAddr:          selfAddr,
+		leaderAddr:        leaderAddr,
+		snapshotTimestamp: 0,
+
 		lastHeartbeat: time.Now(),
 		leaderAlive:   true,
 	}
+
+	n.initElection(electionTimeout)
+	return n
 }
 
 // returns this node’s ID.
