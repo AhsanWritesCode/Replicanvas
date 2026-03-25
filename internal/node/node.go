@@ -1,6 +1,7 @@
 package node
 
 import (
+	"log"
 	"strings"
 	"sync"
 	"time"
@@ -57,14 +58,14 @@ type Node struct {
 NewNode creates and initializes a new Node.
 
 Inputs:
-- c: shared canvas state
-- nodeID: this node’s ID
-- leaderID: current leader’s ID
-- peersCSV: comma-separated list of peer addresses in "id=address" format
-  (e.g. "1=localhost:8080,2=localhost:8081,3=localhost:8082")
-- selfAddr: this node’s own HTTP address
-- leaderAddr: address of the leader
-- electionTimeout: how long to wait for bully responses during an election
+  - c: shared canvas state
+  - nodeID: this node’s ID
+  - leaderID: current leader’s ID
+  - peersCSV: comma-separated list of peer addresses in "id=address" format
+    (e.g. "1=localhost:8080,2=localhost:8081,3=localhost:8082")
+  - selfAddr: this node’s own HTTP address
+  - leaderAddr: address of the leader
+  - electionTimeout: how long to wait for bully responses during an election
 */
 func NewNode(c *canvas.Canvas, nodeID, leaderID int, peersCSV, selfAddr, leaderAddr string, electionTimeout time.Duration) *Node {
 	peerInfos, peers := ParsePeersWithIDs(peersCSV)
@@ -96,6 +97,15 @@ func NewNode(c *canvas.Canvas, nodeID, leaderID int, peersCSV, selfAddr, leaderA
 	}
 
 	n.initElection(electionTimeout)
+
+	// On startup, trigger an election after a short delay to allow the HTTP server to start.
+	// This ensures that a recovering node doesn't just assume it's the leader from its old condfig, otherwise it will just become the leader again without discovering that there is a new leader
+	go func() {
+		time.Sleep(2 * time.Second)
+		log.Printf("[startup] node %d triggering initial election to discover or become leader", nodeID)
+		n.StartElection()
+	}()
+
 	return n
 }
 
@@ -154,6 +164,15 @@ func (n *Node) UpdateHeartbeatFromLeader(leaderID int) {
 	n.leaderID = leaderID
 	n.lastHeartbeat = time.Now()
 	n.leaderAlive = true
+
+	// Update leaderAddr from peerInfos so we know where to forward writes.
+	// This handles the case where a new leader was elected while this node was down.
+	for _, p := range n.peerInfos {
+		if p.ID == leaderID {
+			n.leaderAddr = p.Addr
+			break
+		}
+	}
 }
 
 /*
