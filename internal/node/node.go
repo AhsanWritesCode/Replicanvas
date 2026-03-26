@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/AhsanWritesCode/559-project/internal/canvas"
+	"github.com/AhsanWritesCode/559-project/internal/snapshot"
 )
 
 // It is an interface shadowing this function present in websocket.go
@@ -46,6 +47,7 @@ type Node struct {
 	selfAddr          string
 	leaderAddr        string
 	snapshotTimestamp int64
+	snapshotPath      string
 
 	lastHeartbeat time.Time
 	leaderAlive   bool
@@ -187,6 +189,8 @@ func (n *Node) MarkLeaderDead() {
 
 /*
 sets a new leader and updates related state.
+If the new leader is a different node, syncs the canvas from the leader
+so this node has the most up to date state.
 
 Inputs:
 - id: leader’s ID
@@ -194,12 +198,36 @@ Inputs:
 */
 func (n *Node) SetLeader(id int, addr string) {
 	n.mu.Lock()
-	defer n.mu.Unlock()
-
+	isFollower := id != n.nodeID
+	snapshotPath := n.snapshotPath
 	n.leaderID = id
 	n.leaderAddr = addr
 	n.leaderAlive = true
 	n.lastHeartbeat = time.Now()
+	n.mu.Unlock()
+
+	// If we are a follower, sync canvas from the leader so we have the latest state.
+	// Run in a goroutine so we don’t block the caller.
+	if isFollower && addr != "" && snapshotPath != "" {
+		go func() {
+			ts, err := snapshot.SyncFromLeader(n.Canvas, addr, snapshotPath)
+			if err != nil {
+				log.Printf("[sync] failed to sync from leader: %v", err)
+				return
+			}
+			n.SetSnapshotTimestamp(ts)
+		}()
+	}
+}
+
+/*
+SetSnapshotPath sets the path where this node’s snapshot file is stored.
+Called once during startup so that SetLeader can trigger a sync.
+*/
+func (n *Node) SetSnapshotPath(path string) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	n.snapshotPath = path
 }
 
 /*

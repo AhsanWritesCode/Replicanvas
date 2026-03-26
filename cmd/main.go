@@ -60,8 +60,10 @@ func main() {
 		electionTimeout,
 	)
 
-	// Set the snapshot timestamp so elections know how recent our data is
+	// Set the snapshot timestamp and path so elections know how recent our data is,
+	// and so SetLeader can trigger a sync from the leader when this node is a follower
 	n.SetSnapshotTimestamp(snapshotTs)
+	n.SetSnapshotPath(snapshotPath)
 
 	// Save canvas to disk every 30 seconds, update snapshot timestamp after each save
 	// This is to ensure that if the node crashes, it can recover its state from the snapshot

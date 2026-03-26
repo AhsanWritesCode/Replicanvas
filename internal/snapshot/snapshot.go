@@ -2,7 +2,9 @@ package snapshot
 
 import (
 	"encoding/json"
+	"io"
 	"log"
+	"net/http"
 	"os"
 	"time"
 
@@ -110,6 +112,63 @@ Inputs:
   - onSave: callback called after each successful save with the snapshot timestamp,
     used to update the node's snapshot timestamp for elections
 */
+/*
+SyncFromLeader fetches the leader's canvas snapshot via GET /snapshot,
+overwrites this node's local snapshot file with it, then applies it to the canvas.
+Called when a recovering node discovers a leader so it gets the latest state
+instead of serving stale data from its old snapshot.
+
+Inputs:
+- c: the canvas to apply the snapshot to
+- leaderAddr: the leader's HTTP address (e.g. "localhost:8082")
+- localPath: path to this node's snapshot file (e.g. "./snapshot-node4.json")
+
+Returns:
+- int64: the timestamp to set on the node for election comparison
+- error: if the fetch or file write fails
+*/
+func SyncFromLeader(c *canvas.Canvas, leaderAddr string, localPath string) (int64, error) {
+	url := "http://" + leaderAddr + "/snapshot"
+	resp, err := http.Get(url)
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return 0, err
+	}
+
+	// The leader's GET /snapshot returns {width, height, pixels} without a timestamp.
+	// Parse the pixels, apply them to our canvas, then save as a proper snapshot
+	// with a timestamp so future elections use the correct value.
+	var data struct {
+		Width  int        `json:"width"`
+		Height int        `json:"height"`
+		Pixels [][]string `json:"pixels"`
+	}
+	if err := json.Unmarshal(body, &data); err != nil {
+		return 0, err
+	}
+
+	// Apply the leader's canvas state to our local canvas
+	for y := 0; y < data.Height && y < c.Height; y++ {
+		for x := 0; x < data.Width && x < c.Width; x++ {
+			c.SetPixel(x, y, data.Pixels[y][x])
+		}
+	}
+
+	// Save it as our own snapshot file (with timestamp) so it persists
+	ts, err := Save(c, localPath)
+	if err != nil {
+		return 0, err
+	}
+
+	log.Printf("[sync] synced canvas from leader at %s, saved to %s (timestamp=%d)", leaderAddr, localPath, ts)
+	return ts, nil
+}
+
 func StartPeriodicSave(c *canvas.Canvas, path string, interval time.Duration, onSave func(int64)) {
 	go func() {
 		// we'll use a ticker to save the canvas to disk at the regular interval
