@@ -48,6 +48,12 @@ func (n *Node) HandleHeartbeat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// If we think we're the leader but receive a heartbeat from a different leader,
+	// it means another node won an election while we were down. Step down.
+	if n.IsLeader() && msg.LeaderID != n.NodeID() {
+		log.Printf("[heartbeat] node %d stepping down, received heartbeat from leader %d", n.NodeID(), msg.LeaderID)
+	}
+
 	n.UpdateHeartbeatFromLeader(msg.LeaderID)
 	w.WriteHeader(http.StatusOK)
 }
@@ -131,8 +137,8 @@ Runs in a goroutine for followers to detect leader failure.
 
 Functions:
 - It uses a ticker (currently set at 200ms) to check time since last heartbeat
-- If timeout exceeded, marks leaderAlive = false
-- Logs that leader is suspected dead (TODO Call for an election in future updates)
+- If timeout exceeded and no election is already running, triggers a leader election
+- Keeps retrying elections until a new leader is established
 - Does nothing if this node is the leader
 */
 func (n *Node) watchLoop(timeout time.Duration) {
@@ -146,12 +152,14 @@ func (n *Node) watchLoop(timeout time.Duration) {
 
 		n.mu.Lock()
 		since := time.Since(n.lastHeartbeat)
-		alive := n.leaderAlive
 		n.mu.Unlock()
-		if since > timeout && alive {
-			n.MarkLeaderDead()
-			log.Printf("heartbeat: leader %d missed for %v (timeout %v). Leader may be dead.",
-				n.LeaderID(), since.Truncate(time.Millisecond), timeout)
+
+		// If heartbeat timeout exceeded, start an election.
+		// StartElection() has its own inProgress guard so we won't
+		// start duplicate elections, but we keep checking on every tick
+		// so that if an election fails (no quorum), we retry.
+		if since > timeout {
+			go n.StartElection()
 		}
 	}
 }
