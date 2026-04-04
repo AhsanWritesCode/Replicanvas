@@ -11,7 +11,7 @@ Brush Size:
  - Only visible when mode is set to 'brush'
   
 COLORS constant:
- - Predefined palette of 12 hex color codes available for pixels
+ - 12 hex color codes available for pixels
 
 Props:
  @param {string} selectedColor - Currently selected hex color code
@@ -40,6 +40,7 @@ const COLORS = [
   '#FFC0CB',
 ];
 
+// Learned how to render conditional UI elements based on the current mode from https://react.dev/learn/conditional-rendering
 const Toolbar = ({ selectedColor, onColorChange, mode, onModeChange, brushSize, onBrushSizeChange }) => {
   return (
     <div className="toolbar">
