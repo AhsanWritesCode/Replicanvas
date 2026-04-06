@@ -13,7 +13,7 @@ LOG_DIR="$ROOT/logs"
 mkdir -p "$ROOT/bin" "$LOG_DIR"
 
 echo "Building server..."
-(cd "$ROOT" && go build -o "$BINARY" ./cmd/main.go)
+(cd "$ROOT" && go build -o "$BINARY" ./cmd)
 echo "Build complete."
 
 # All peers listed with id=address format so election can map leader IDs to addresses
@@ -21,40 +21,40 @@ echo "Build complete."
 
 # Node 1: Follower
 NODE_ID=1 \
-LEADER_ID=4 \
+LEADER_ID=0 \
 PORT=8080 \
 PEERS="2=localhost:8081,3=localhost:8082,4=localhost:8083" \
-LEADER_ADDR="localhost:8083" \
+LEADER_ADDR= \
 "$BINARY" > "$LOG_DIR/node1.log" 2>&1 &
 echo $! > "$LOG_DIR/node1.pid"
 echo "Started Node 1 (follower) on :8080  [PID $(cat "$LOG_DIR/node1.pid")]"
 
 # Node 2: Follower
 NODE_ID=2 \
-LEADER_ID=4 \
+LEADER_ID=0 \
 PORT=8081 \
 PEERS="1=localhost:8080,3=localhost:8082,4=localhost:8083" \
-LEADER_ADDR="localhost:8083" \
+LEADER_ADDR= \
 "$BINARY" > "$LOG_DIR/node2.log" 2>&1 &
 echo $! > "$LOG_DIR/node2.pid"
 echo "Started Node 2 (follower) on :8081  [PID $(cat "$LOG_DIR/node2.pid")]"
 
 # Node 3: Follower
 NODE_ID=3 \
-LEADER_ID=4 \
+LEADER_ID= \
 PORT=8082 \
 PEERS="1=localhost:8080,2=localhost:8081,4=localhost:8083" \
-LEADER_ADDR="localhost:8083" \
+LEADER_ADDR= \
 "$BINARY" > "$LOG_DIR/node3.log" 2>&1 &
 echo $! > "$LOG_DIR/node3.pid"
 echo "Started Node 3 (follower) on :8082  [PID $(cat "$LOG_DIR/node3.pid")]"
 
 # Node 4: Leader (highest ID)
 NODE_ID=4 \
-LEADER_ID=4 \
+LEADER_ID=0 \
 PORT=8083 \
 PEERS="1=localhost:8080,2=localhost:8081,3=localhost:8082" \
-LEADER_ADDR="localhost:8083" \
+LEADER_ADDR= \
 "$BINARY" > "$LOG_DIR/node4.log" 2>&1 &
 echo $! > "$LOG_DIR/node4.pid"
 echo "Started Node 4 (leader)   on :8083  [PID $(cat "$LOG_DIR/node4.pid")]"

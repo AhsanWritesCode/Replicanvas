@@ -18,10 +18,10 @@ Each node sends its credentials so other nodes can compare and decide
 whether to "bully" (override) or accept the sender as a candidate.
 
 Fields:
-- NodeID: the ID of the node starting or participating in the election
-- SnapshotTimestamp: when this node last took a snapshot of its canvas,
-  nodes with more recent snapshots are preferred as leaders because they have
-  the most up to date data. If timestamps are equal, higher NodeID wins.
+  - NodeID: the ID of the node starting or participating in the election
+  - SnapshotTimestamp: when this node last took a snapshot of its canvas,
+    nodes with more recent snapshots are preferred as leaders because they have
+    the most up to date data. If timestamps are equal, higher NodeID wins.
 */
 type ElectionMsg struct {
 	NodeID            int   `json:"node_id"`
@@ -32,8 +32,8 @@ type ElectionMsg struct {
 ElectionResponse is the reply a node sends after receiving an ElectionMsg.
 
 Fields:
-- Bully: true means "I have better credentials than you, back off",
-  false means "you are a valid candidate, I won't challenge you"
+  - Bully: true means "I have better credentials than you, back off",
+    false means "you are a valid candidate, I won't challenge you"
 */
 type ElectionResponse struct {
 	Bully bool `json:"bully"`
@@ -109,6 +109,7 @@ func (n *Node) StartElection() {
 	n.election.mu.Lock()
 	if n.election.inProgress {
 		n.election.mu.Unlock()
+		log.Printf("[election] node %d ignored StartElection because an election is already in progress", n.NodeID())
 		return
 	}
 	n.election.inProgress = true
@@ -128,7 +129,8 @@ func (n *Node) StartElection() {
 	myAddr := n.selfAddr
 	n.mu.RUnlock()
 
-	log.Printf("[election] node %d starting election (snapshot_ts=%d)", myID, myTimestamp)
+	log.Printf("[election] node %d starting election: self_addr=%s snapshot_ts=%d peers=%d quorum_needed=%d",
+		myID, myAddr, myTimestamp, len(peers), ((len(peers)+1)/2)+1)
 
 	payload, _ := json.Marshal(ElectionMsg{
 		NodeID:            myID,
@@ -140,6 +142,7 @@ func (n *Node) StartElection() {
 	bullyCount := 0
 	okCount := 0
 
+	log.Printf("[election] node %d broadcasting election request to peers", myID)
 	var wg sync.WaitGroup
 	for _, peer := range peers {
 		wg.Add(1)
@@ -156,9 +159,11 @@ func (n *Node) StartElection() {
 			}
 			req.Header.Set("Content-Type", "application/json")
 
+			log.Printf("[election] node %d sending election request to peer %s (snapshot_ts=%d)", myID, peer, myTimestamp)
+
 			resp, err := http.DefaultClient.Do(req)
 			if err != nil {
-				log.Printf("[election] peer %s unreachable: %v", peer, err)
+				log.Printf("[election] node %d could not reach peer %s during election: %v", myID, peer, err)
 				return
 			}
 			defer resp.Body.Close()
@@ -167,6 +172,7 @@ func (n *Node) StartElection() {
 			if err := json.NewDecoder(resp.Body).Decode(&reply); err != nil {
 				return
 			}
+			log.Printf("[election] node %d received election response from peer %s: bully=%t", myID, peer, reply.Bully)
 
 			mu.Lock()
 			if reply.Bully {
@@ -179,10 +185,11 @@ func (n *Node) StartElection() {
 	}
 
 	wg.Wait()
+	log.Printf("[election] node %d election round complete: bully_responses=%d ok_responses=%d total_votes=%d", myID, bullyCount, okCount, okCount+1)
 
 	// If any peer bullied us, back off and wait for their leader announcement
 	if bullyCount > 0 {
-		log.Printf("[election] node %d was bullied by %d peer(s), backing off", myID, bullyCount)
+		log.Printf("[election] node %d lost election round: bullied_by=%d peer(s), backing off and waiting for leader announcement", myID, bullyCount)
 		return
 	}
 
@@ -192,10 +199,10 @@ func (n *Node) StartElection() {
 	quorum := (totalNodes / 2) + 1
 
 	if okCount+1 >= quorum {
-		log.Printf("[election] node %d won election (votes=%d, quorum=%d), announcing leadership", myID, okCount+1, quorum)
+		log.Printf("[election] node %d won election: votes=%d quorum=%d self_addr=%s, transitioning to leader and broadcasting announcement", myID, okCount+1, quorum, myAddr)
 		n.becomeLeader(myAddr)
 	} else {
-		log.Printf("[election] node %d did not reach quorum (votes=%d, need=%d)", myID, okCount+1, quorum)
+		log.Printf("[election] node %d could not become leader: votes=%d required=%d, staying follower", myID, okCount+1, quorum)
 	}
 }
 
@@ -213,7 +220,7 @@ func (n *Node) becomeLeader(selfAddr string) {
 	myID := n.NodeID()
 	n.SetLeader(myID, selfAddr)
 
-	log.Printf("[election] node %d is now the LEADER", myID)
+	log.Printf("[election] node %d became the LEADER: leader_addr=%s snapshot_ts=%d", myID, selfAddr, n.SnapshotTimestamp())
 
 	payload, _ := json.Marshal(LeaderMsg{
 		LeaderID:   myID,
@@ -233,12 +240,14 @@ func (n *Node) becomeLeader(selfAddr string) {
 			}
 			req.Header.Set("Content-Type", "application/json")
 
+			log.Printf("[election] node %d sending leadership announcement to peer %s", myID, peer)
 			resp, err := http.DefaultClient.Do(req)
 			if err != nil {
-				log.Printf("[election] failed to announce leader to %s: %v", peer, err)
+				log.Printf("[election] node %d failed to announce leadership to peer %s: %v", myID, peer, err)
 				return
 			}
 			resp.Body.Close()
+			log.Printf("[election] node %d successfully announced leadership to peer %s", myID, peer)
 		}(peer)
 	}
 }
@@ -273,6 +282,8 @@ func (n *Node) HandleElection(w http.ResponseWriter, r *http.Request) {
 	myTimestamp := n.snapshotTimestamp
 	n.mu.RUnlock()
 
+	log.Printf("[election] node %d received election request from node %d: candidate_snapshot_ts=%d local_snapshot_ts=%d", myID, msg.NodeID, msg.SnapshotTimestamp, myTimestamp)
+
 	// Modified Bully comparison: snapshot timestamp first, then node ID as tiebreaker
 	iAmBetter := false
 	if myTimestamp > msg.SnapshotTimestamp {
@@ -280,12 +291,24 @@ func (n *Node) HandleElection(w http.ResponseWriter, r *http.Request) {
 	} else if myTimestamp == msg.SnapshotTimestamp && myID > msg.NodeID {
 		iAmBetter = true
 	}
+	log.Printf("[election] node %d comparison result against node %d: bully=%t (local_ts=%d peer_ts=%d local_id=%d peer_id=%d)", myID, msg.NodeID, iAmBetter, myTimestamp, msg.SnapshotTimestamp, myID, msg.NodeID)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(ElectionResponse{Bully: iAmBetter})
 
 	if iAmBetter {
-		log.Printf("[election] node %d bullied node %d, starting own election", myID, msg.NodeID)
+		if n.IsLeader() {
+			log.Printf("[election] node %d ignored election trigger from node %d because it is already leader", myID, msg.NodeID)
+			return
+		}
+
+		leaderID := n.LeaderID()
+		if leaderID != 0 {
+			log.Printf("[election] node %d suppressed election trigger from node %d because leader is already known as Node %d", myID, msg.NodeID, leaderID)
+			return
+		}
+
+		log.Printf("[election] node %d bullied node %d because it has better election credentials, knows no leader, starting its own election", myID, msg.NodeID)
 		go n.StartElection()
 	}
 }
@@ -311,10 +334,9 @@ func (n *Node) HandleLeaderAnnouncement(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	log.Printf("[election] node %d accepted new leader: node %d at %s",
-		n.NodeID(), msg.LeaderID, msg.LeaderAddr)
-
+	oldLeaderID := n.LeaderID()
 	n.SetLeader(msg.LeaderID, msg.LeaderAddr)
+	log.Printf("[election] node %d accepted new leader announcement: old_leader=%d new_leader=%d leader_addr=%s", n.NodeID(), oldLeaderID, msg.LeaderID, msg.LeaderAddr)
 
 	// Stop any in progress election since a leader has been chosen
 	n.election.mu.Lock()

@@ -52,6 +52,15 @@ func (n *Node) HandleHeartbeat(w http.ResponseWriter, r *http.Request) {
 	// it means another node won an election while we were down. Step down.
 	if n.IsLeader() && msg.LeaderID != n.NodeID() {
 		log.Printf("[heartbeat] node %d stepping down, received heartbeat from leader %d", n.NodeID(), msg.LeaderID)
+		var leaderAddr string
+		for _, p := range n.peerInfos {
+			if p.ID == msg.LeaderID {
+				leaderAddr = p.Addr
+				break
+			}
+		}
+		n.SetLeader(msg.LeaderID, leaderAddr)
+		return
 	}
 
 	n.UpdateHeartbeatFromLeader(msg.LeaderID)
@@ -144,8 +153,13 @@ Functions:
 func (n *Node) watchLoop(timeout time.Duration) {
 	t := time.NewTicker(200 * time.Millisecond)
 	defer t.Stop()
+	startedAt := time.Now()
 
 	for range t.C {
+		if time.Since(startedAt) < 3*time.Second {
+			// still in startup grace period for HTTP
+			continue
+		}
 		if n.IsLeader() {
 			continue
 		}
@@ -159,6 +173,7 @@ func (n *Node) watchLoop(timeout time.Duration) {
 		// start duplicate elections, but we keep checking on every tick
 		// so that if an election fails (no quorum), we retry.
 		if since > timeout {
+			log.Printf("Node %d missed heartbeat from leader %d, starting election", n.NodeID(), n.LeaderID())
 			go n.StartElection()
 		}
 	}
