@@ -53,7 +53,7 @@ echo "Started Node 3 (follower) on :8082  [PID $(cat "$LOG_DIR/node3.pid")]"
 NODE_ID=4 \
 LEADER_ID=0 \
 PORT=8083 \
-PEERS="1=localhost:8080,2=localhost:8081,3=localhost:8082,5=localhost:8084"
+PEERS="1=localhost:8080,2=localhost:8081,3=localhost:8082,5=localhost:8084" \
 LEADER_ADDR= \
 "$BINARY" > "$LOG_DIR/node4.log" 2>&1 &
 echo $! > "$LOG_DIR/node4.pid"
