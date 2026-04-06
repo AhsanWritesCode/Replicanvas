@@ -4,7 +4,7 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOG_DIR="$SCRIPT_DIR/../logs"
 
-for i in 1 2 3 4; do
+for i in 1 2 3 4 5; do
     PID_FILE="$LOG_DIR/node${i}.pid"
     if [ -f "$PID_FILE" ]; then
         PID=$(cat "$PID_FILE")

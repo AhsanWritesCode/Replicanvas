@@ -23,22 +23,26 @@ LOG_DIR="$ROOT/logs"
 case $NODE in
     1)
         PORT=8080
-        PEERS="2=localhost:8081,3=localhost:8082,4=localhost:8083"
+        PEERS="2=localhost:8081,3=localhost:8082,4=localhost:8083,5=localhost:8084"
         ;;
     2)
         PORT=8081
-        PEERS="1=localhost:8080,3=localhost:8082,4=localhost:8083"
+        PEERS="1=localhost:8080,3=localhost:8082,4=localhost:8083,5=localhost:8084"
         ;;
     3)
         PORT=8082
-        PEERS="1=localhost:8080,2=localhost:8081,4=localhost:8083"
+        PEERS="1=localhost:8080,2=localhost:8081,4=localhost:8083,5=localhost:8084"
         ;;
     4)
         PORT=8083
-        PEERS="1=localhost:8080,2=localhost:8081,3=localhost:8082"
+        PEERS="1=localhost:8080,2=localhost:8081,3=localhost:8082,5=localhost:8084"
+        ;;
+    5)
+        PORT=8084
+        PEERS="1=localhost:8080,2=localhost:8081,3=localhost:8082,4=localhost:8083"
         ;;
     *)
-        echo "Unknown node number: $NODE (expected 1, 2, 3, or 4)"
+        echo "Unknown node number: $NODE (expected 1, 2, 3, 4, or 5)"
         exit 1
         ;;
 esac
