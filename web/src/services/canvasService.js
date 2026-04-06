@@ -2,7 +2,7 @@
 // Learned from https://developer.mozilla.org/en-US/docs/Web/API/WebSocket
 
 // All known replicas in the cluster
-const ALL_REPLICAS = ["localhost:8080", "localhost:8081", "localhost:8082", "localhost:8083"];
+const ALL_REPLICAS = ["localhost:8080", "localhost:8081", "localhost:8082", "localhost:8083", "localhost:8084"];
 
 // Two modes:
 // 1. With ?server= param: connects to that specific replica only, no auto reconnect.

@@ -80,6 +80,7 @@ func Load(c *canvas.Canvas, path string) (int64, error) {
 	if err != nil {
 		if os.IsNotExist(err) {
 			// No snapshot file means fresh start, not an error
+			log.Printf("[snapshot] no local snapshot found at %s (fresh start)", path)
 			return 0, nil
 		}
 		return 0, err
@@ -128,6 +129,7 @@ Returns:
 - error: if the fetch or file write fails
 */
 func SyncFromLeader(c *canvas.Canvas, leaderAddr string, localPath string) (int64, error) {
+	log.Printf("[sync] requesting snapshot from leader at %s to catch up", leaderAddr)
 	url := "http://" + leaderAddr + "/snapshot"
 	resp, err := http.Get(url)
 	if err != nil {

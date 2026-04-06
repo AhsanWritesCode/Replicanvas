@@ -2,6 +2,7 @@ package node
 
 import (
 	"log"
+	"math/rand"
 	"strings"
 	"sync"
 	"time"
@@ -103,9 +104,30 @@ func NewNode(c *canvas.Canvas, nodeID, leaderID int, peersCSV, selfAddr, leaderA
 	// On startup, trigger an election after a short delay to allow the HTTP server to start.
 	// This ensures that a recovering node doesn't just assume it's the leader from its old condfig, otherwise it will just become the leader again without discovering that there is a new leader
 	go func() {
-		time.Sleep(2 * time.Second)
-		log.Printf("[startup] node %d triggering initial election to discover or become leader", nodeID)
-		n.StartElection()
+		time.Sleep(2 * time.Second) //Setting up HTTP
+		leaderOriginallyKnown := n.LeaderID() != 0
+		n.election.mu.Lock()
+		electionInProgress := n.election.inProgress
+		n.election.mu.Unlock()
+
+		// Random unique timeout for each node before election so we stop getting a million messages at the same time
+		seed := time.Now().UnixNano() + int64(nodeID) // ID is unique for each node
+		r := rand.New(rand.NewSource(seed))
+		timeout := time.Duration(r.Intn(100)) * time.Millisecond
+		time.Sleep(timeout)
+
+		leaderNowKnown := n.LeaderID() != 0
+
+		switch {
+		case !leaderOriginallyKnown && !leaderNowKnown && !electionInProgress:
+			log.Printf("[startup] node %d sees no leader (new system), triggering election", nodeID)
+			n.StartElection()
+		case !leaderOriginallyKnown && leaderNowKnown:
+			log.Printf("[startup] node %d learned leader=%d during startup, no election needed", nodeID, n.LeaderID())
+		case electionInProgress:
+			log.Printf("[startup] node %d saw election already in progress, skipping startup election", nodeID)
+		}
+
 	}()
 
 	return n
@@ -210,6 +232,7 @@ func (n *Node) SetLeader(id int, addr string) {
 	// Run in a goroutine so we don’t block the caller.
 	if isFollower && addr != "" && snapshotPath != "" {
 		go func() {
+			log.Printf("[sync] node %d rejoining as a follower, trying to sync from leader: %d", n.NodeID(), n.LeaderID())
 			ts, err := snapshot.SyncFromLeader(n.Canvas, addr, snapshotPath)
 			if err != nil {
 				log.Printf("[sync] failed to sync from leader: %v", err)
