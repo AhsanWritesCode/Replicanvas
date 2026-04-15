@@ -45,7 +45,11 @@ func main() {
 
 	// selfAddr is this node's own address — needed for leader announcements
 	// so followers know where to forward writes after an election
-	selfAddr := "localhost:" + port
+	selfAddr := os.Getenv("SELF_ADDR")
+	if selfAddr == "" {
+		// default to localhost
+		selfAddr = "localhost:" + port
+	}
 
 	hbTimeout := config.MustDurationEnvMs("HB_TIMEOUT_MS", 1500)
 	electionTimeout := config.MustDurationEnvMs("ELECTION_TIMEOUT_MS", 2000)
