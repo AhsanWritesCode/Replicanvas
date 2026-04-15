@@ -29,11 +29,11 @@ echo "Build complete."
 case $NODE in
     1)
         SELF_ADDR="$A_IP:$PORT"
-        PEERS="2=$B_IP:$PORT"
+        PEERS="2=$B_IP:$PORT, 3=$C_IP:$PORT"
         ;;
     2)
         SELF_ADDR="$B_IP:$PORT"
-        PEERS="1=$A_IP:$PORT"
+        PEERS="1=$A_IP:$PORTq, 3=$C_IP:$PORT"
         ;;
 
     3)

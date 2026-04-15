@@ -7,7 +7,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"syscall"
 	"time"
 
 	"github.com/AhsanWritesCode/559-project/internal/canvas"
@@ -17,14 +16,6 @@ import (
 	"github.com/AhsanWritesCode/559-project/internal/server"
 	"github.com/AhsanWritesCode/559-project/internal/snapshot"
 )
-
-// setReuseAddr sets SO_REUSEADDR on the socket so we can restart the server
-// immediately without waiting for TIME_WAIT connections to clear on the port
-func setReuseAddr(network, address string, conn syscall.RawConn) error {
-	return conn.Control(func(fd uintptr) {
-		syscall.SetsockoptInt(int(fd), syscall.SOL_SOCKET, syscall.SO_REUSEADDR, 1)
-	})
-}
 
 // entry point for the application, initializes the canvas and the HTTP and Websocket handlers and starts the server
 func main() {
