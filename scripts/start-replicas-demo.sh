@@ -5,6 +5,7 @@ set -e
 
 A_IP="10.14.135.99"   # Laptop A — runs node 1
 B_IP="10.14.121.175"   # Laptop B — runs node 2
+C_IP="10.14.99.58"  # Laptop C — runs node 3s
 PORT=8080
 # =================================================
 
@@ -33,6 +34,11 @@ case $NODE in
     2)
         SELF_ADDR="$B_IP:$PORT"
         PEERS="1=$A_IP:$PORT"
+        ;;
+
+    3)
+        SELF_ADDR="$C_IP:$PORT"
+        PEERS="1=$A_IP:$PORT,2=$B_IP:$PORT"
         ;;
     *)
         echo "Unknown node number: $NODE (expected 1, 2, or 3)"

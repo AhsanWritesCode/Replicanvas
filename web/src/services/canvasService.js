@@ -2,7 +2,7 @@
 // Learned from https://developer.mozilla.org/en-US/docs/Web/API/WebSocket
 
 // All known replicas in the cluster
-const ALL_REPLICAS = ["10.14.135.99:8080", "10.14.121.175:8080"]; // Change to IPs of machines
+const ALL_REPLICAS = ["10.14.135.99:8080", "10.14.121.175:8080", "10.14.99.58:8080"]; // Change to IPs of machines
 
 // Two modes:
 // 1. With ?server= param: connects to that specific replica only, no auto reconnect.
