@@ -1,7 +1,7 @@
 #!/bin/bash
 # Restarts a previously killed node.
 # Usage: ./restart-node.sh <node_number>
-# Example: ./restart-node.sh 4    (restarts node 4 after it was killed)
+# Example: ./restart-node.sh 5    (restarts node 5 after it was killed)
 #
 # The node will start with LEADER_ID pointing to itself, but it will
 # receive heartbeats from the current leader within ~500ms and update
@@ -9,7 +9,7 @@
 
 if [ -z "$1" ]; then
     echo "Usage: $0 <node_number>"
-    echo "Example: $0 4    (restarts node 4)"
+    echo "Example: $0 5    (restarts node 5)"
     exit 1
 fi
 
@@ -60,11 +60,11 @@ fi
 # Build if binary doesn't exist
 if [ ! -f "$BINARY" ]; then
     echo "Building server..."
-    (cd "$ROOT" && go build -o "$BINARY" ./cmd/main.go)
+    (cd "$ROOT" && go build -o "$BINARY" ./cmd)
 fi
 
 # Start the node
-# LEADER_ID is set to itself, it will discover the real leader
+# LEADER_ID is set to itself; it will discover the real leader
 # via heartbeats from the current leader within ~500ms
 NODE_ID=$NODE \
 LEADER_ID=$NODE \

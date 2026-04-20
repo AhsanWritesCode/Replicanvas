@@ -8,11 +8,23 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/AhsanWritesCode/559-project/internal/models"
 	"github.com/AhsanWritesCode/559-project/internal/node"
 )
+
+// Small function to show crashing while replicating
+func shouldCrashOnReplicationFlag(nodeID int) bool {
+	flag := fmt.Sprintf("crash_node_%d_on_replication.flag", nodeID)
+	_, err := os.Stat(flag)
+	if err == nil {
+		_ = os.Remove(flag)
+		return true
+	}
+	return false
+}
 
 /*
 This function is hwo the leader replicates to others after applying changes locally
@@ -34,6 +46,12 @@ func ReplicateToPeers(n *node.Node, rawMsg []byte) {
 
 	for _, peer := range peers {
 		go func(peer string) {
+			// Just to crash stuff
+			if shouldCrashOnReplicationFlag(n.NodeID()) {
+				log.Printf("replication: crash flag detected for node %d, crashing node", n.NodeID())
+				os.Exit(1)
+			}
+
 			ctx, cancel := context.WithTimeout(context.Background(), 800*time.Millisecond)
 			defer cancel()
 
