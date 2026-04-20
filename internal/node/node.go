@@ -185,18 +185,8 @@ func (n *Node) UpdateHeartbeatFromLeader(leaderID int) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
-	n.leaderID = leaderID
 	n.lastHeartbeat = time.Now()
 	n.leaderAlive = true
-
-	// Update leaderAddr from peerInfos so we know where to forward writes.
-	// This handles the case where a new leader was elected while this node was down.
-	for _, p := range n.peerInfos {
-		if p.ID == leaderID {
-			n.leaderAddr = p.Addr
-			break
-		}
-	}
 }
 
 /*
@@ -219,6 +209,16 @@ Inputs:
 - addr: leader’s address
 */
 func (n *Node) SetLeader(id int, addr string) {
+
+	// if there is no address, system should try to find it.
+	if addr == "" {
+		for _, p := range n.peerInfos {
+			if p.ID == id {
+				addr = p.Addr
+				break
+			}
+		}
+	}
 	n.mu.Lock()
 	isFollower := id != n.nodeID
 	snapshotPath := n.snapshotPath
