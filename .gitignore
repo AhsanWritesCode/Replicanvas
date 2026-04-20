@@ -71,9 +71,5 @@ docker-compose.override.yml
 logs/
 *.pid
 
-<<<<<<< HEAD
 scripts/*.json
-=======
-#scripts 
 scripts/*.log
->>>>>>> final-presentation
