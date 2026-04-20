@@ -3,9 +3,9 @@
 
 set -e
 
-A_IP="10.14.135.99"   # Laptop A — runs node 1
-B_IP="10.14.121.175"   # Laptop B — runs node 2
-C_IP="10.14.99.58"  # Laptop C — runs node 3s
+A_IP="10.13.143.207"   # Laptop A — runs node 1
+B_IP="10.13.97.171"   # Laptop B — runs node 2
+C_IP="10.13.131.115"  # Laptop C — runs node 3s
 PORT=8080
 # =================================================
 

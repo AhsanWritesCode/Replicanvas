@@ -2,7 +2,7 @@
 // Learned from https://developer.mozilla.org/en-US/docs/Web/API/WebSocket
 
 // All known replicas in the cluster
-const ALL_REPLICAS = ["10.14.135.99:8080", "10.14.121.175:8080", "10.14.99.58:8080"]; // Change to IPs of machines
+const ALL_REPLICAS = ["10.13.143.207:8080", "10.13.97.171:8080", "10.13.131.115:8080"]; // Change to IPs of machines
 
 // Two modes:
 // 1. With ?server= param: connects to that specific replica only, no auto reconnect.
@@ -21,7 +21,7 @@ class CanvasService {
   constructor() {
     this.ws = null; // WebSocket instance
     this.messageHandlers = []; // Handlers to call when a WebSocket message is received
-    this.currentServer = fixedServer || ALL_REPLICAS[0]; // Which replica we're connected to
+    this.currentServer = fixedServer || ALL_REPLICAS[Math.floor(Math.random() * ALL_REPLICAS.length)]; // Which replica we're connected to
     this.autoReconnect = !fixedServer; // Only auto reconnect if no fixed server was specified
     this.reconnecting = false; // Prevents multiple reconnect attempts at the same time
     this.snapshotCallback = null; // Callback to refresh the canvas after reconnecting
