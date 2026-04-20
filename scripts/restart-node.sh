@@ -13,6 +13,11 @@ if [ -z "$1" ]; then
     exit 1
 fi
 
+A_IP="10.12.119.204"   # Laptop A — runs node 1
+B_IP="10.13.139.217"   # Laptop B — runs node 2
+C_IP="10.13.131.22"  # Laptop C — runs node 3s
+PORT=8080
+
 NODE=$1
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$SCRIPT_DIR/.."
@@ -22,27 +27,19 @@ LOG_DIR="$ROOT/logs"
 # Node config: maps node number to port and peers
 case $NODE in
     1)
-        PORT=8080
-        PEERS="2=localhost:8081,3=localhost:8082,4=localhost:8083,5=localhost:8084"
+        SELF_ADDR="$A_IP:$PORT"
+        PEERS="2=$B_IP:$PORT, 3=$C_IP:$PORT"
         ;;
     2)
-        PORT=8081
-        PEERS="1=localhost:8080,3=localhost:8082,4=localhost:8083,5=localhost:8084"
+        SELF_ADDR="$B_IP:$PORT"
+        PEERS="1=$A_IP:$PORT, 3=$C_IP:$PORT"
         ;;
     3)
-        PORT=8082
-        PEERS="1=localhost:8080,2=localhost:8081,4=localhost:8083,5=localhost:8084"
-        ;;
-    4)
-        PORT=8083
-        PEERS="1=localhost:8080,2=localhost:8081,3=localhost:8082,5=localhost:8084"
-        ;;
-    5)
-        PORT=8084
-        PEERS="1=localhost:8080,2=localhost:8081,3=localhost:8082,4=localhost:8083"
+        SELF_ADDR="$C_IP:$PORT"
+        PEERS="1=$A_IP:$PORT,2=$B_IP:$PORT"
         ;;
     *)
-        echo "Unknown node number: $NODE (expected 1, 2, 3, 4, or 5)"
+        echo "Unknown node number: $NODE (expected 1, 2, or 3)"
         exit 1
         ;;
 esac
@@ -69,8 +66,9 @@ fi
 NODE_ID=$NODE \
 LEADER_ID=$NODE \
 PORT=$PORT \
+SELF_ADDR="$SELF_ADDR" \
 PEERS="$PEERS" \
-LEADER_ADDR="localhost:$PORT" \
+LEADER_ADDR= \
 "$BINARY" > "$LOG_DIR/node${NODE}.log" 2>&1 &
 echo $! > "$LOG_DIR/node${NODE}.pid"
 
