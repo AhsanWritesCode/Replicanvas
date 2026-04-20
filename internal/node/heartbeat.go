@@ -48,10 +48,16 @@ func (n *Node) HandleHeartbeat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// If we think we're the leader but receive a heartbeat from a different leader,
-	// it means another node won an election while we were down. Step down.
-	if n.IsLeader() && msg.LeaderID != n.NodeID() {
-		log.Printf("[heartbeat] node %d stepping down, received heartbeat from leader %d", n.NodeID(), msg.LeaderID)
+	currentLeaderID := n.LeaderID()
+
+	// If leader changed (including stepping down), switch via SetLeader
+	if currentLeaderID != msg.LeaderID {
+		if n.IsLeader() && msg.LeaderID != n.NodeID() {
+			log.Printf("[heartbeat] node %d stepping down, received heartbeat from leader %d",
+				n.NodeID(), msg.LeaderID)
+		}
+
+		n.SetLeader(msg.LeaderID, "") // let SetLeader resolve address
 	}
 
 	n.UpdateHeartbeatFromLeader(msg.LeaderID)
