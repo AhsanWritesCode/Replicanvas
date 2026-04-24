@@ -1,0 +1,105 @@
+.toolbar {
+  background-color: #2c3e50;
+  color: white;
+  padding: 15px 20px;
+  display: flex;
+  gap: 40px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  flex-wrap: wrap;
+}
+
+.toolbar-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.toolbar-section h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #ecf0f1;
+}
+
+.mode-selector {
+  display: flex;
+  gap: 10px;
+}
+
+.mode-button {
+  padding: 8px 16px;
+  background-color: #34495e;
+  color: white;
+  border: 2px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.mode-button:hover {
+  background-color: #4a6278;
+}
+
+.mode-button.active {
+  background-color: #3498db;
+  border-color: #2980b9;
+}
+
+.brush-size-control {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.brush-size-control label {
+  font-size: 12px;
+  color: #bdc3c7;
+}
+
+.brush-size-control input[type="range"] {
+  width: 150px;
+}
+
+.color-palette {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+}
+
+.color-button {
+  width: 36px;
+  height: 36px;
+  border: 3px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.color-button:hover {
+  transform: scale(1.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.color-button.selected {
+  border-color: #f1c40f;
+  box-shadow: 0 0 0 2px #2c3e50, 0 0 0 4px #f1c40f;
+}
+
+.current-color-display {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 5px;
+  font-size: 12px;
+  color: #bdc3c7;
+}
+
+.current-color-box {
+  width: 24px;
+  height: 24px;
+  border: 2px solid #ecf0f1;
+  border-radius: 2px;
+}
