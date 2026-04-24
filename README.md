@@ -102,12 +102,23 @@ Connect directly to a particular backend replica:
 http://localhost:3000/?server=localhost:8083
 ```
 
-### Stop replicas
+### Stop all replicas
 
 ```bash
 ./scripts/stop-replicas.sh
 ```
 
+### Stop specific replica
+
+```bash
+./scripts/kill-node.sh <NODE_ID>
+```
+
+### Restart specific replica
+
+```bash
+./scripts/restart-node.sh <NODE_ID>
+```
 
 ## Running on Physical Machines
 
@@ -142,3 +153,5 @@ Then run the frontend and connect to any reachable replica:
 ```text
 http://<machine-ip>:3000/?server=<backend-ip>:8080
 ```
+
+Also update IP addresses on `web\src\services\canvasService.js` as well as `restart-node-demo.sh`.
