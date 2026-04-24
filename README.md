@@ -155,3 +155,5 @@ http://<machine-ip>:3000/?server=<backend-ip>:8080
 ```
 
 Also update IP addresses on `web\src\services\canvasService.js` as well as `restart-node-demo.sh`.
+
+To stop a replica on an individual machine, just run `stop-replicas.sh` (since there is only one node on one machine at a time, it will kill the running replica).
