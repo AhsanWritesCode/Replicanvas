@@ -64,12 +64,17 @@ We are going to be using the Standard Project Layout (This is a Golang standard 
 ├── go.sum
 ├── LICENSE
 └── README.md
-
+```
 
 ## Running the System
+
 ### Start all replicas
 
 From the project root:
+
+```bash
+./scripts/start-replicas.sh
+```
 
 ```bash
 ./scripts/start-replicas.sh
@@ -105,4 +110,39 @@ http://localhost:3000/?server=localhost:8083
 
 ```bash
 ./scripts/stop-replicas.sh
+```
+
+
+## Running on Physical Machines
+
+Update the peer addresses in the startup (use `start-replicas-demo.sh`) script so each node uses reachable machine IPs instead of `localhost`.
+
+Example format:
+
+```bash
+PEERS="2=192.168.1.102:8081,3=192.168.1.103:8082,4=192.168.1.104:8083"
+```
+
+Then start a node on each machine:
+
+```bash
+PORT=8080 NODE_ID=1 LEADER_ID=0 ./bin/server
+```
+
+Example for another machine:
+
+```bash
+PORT=8081 NODE_ID=2 LEADER_ID=0 ./bin/server
+```
+
+Repeat for each replica, adjusting:
+
+- `PORT`
+- `NODE_ID`
+- `PEERS`
+
+Then run the frontend and connect to any reachable replica:
+
+```text
+http://<machine-ip>:3000/?server=<backend-ip>:8080
 ```
