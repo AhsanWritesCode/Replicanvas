@@ -76,10 +76,6 @@ From the project root:
 ./scripts/start-replicas.sh
 ```
 
-```bash
-./scripts/start-replicas.sh
-```
-
 This launches all replica nodes (including leader election and replication services).
 
 ### Start the frontend
