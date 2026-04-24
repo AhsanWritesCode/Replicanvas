@@ -1,5 +1,5 @@
 # CPSC 559 Group Project - Distributed r/place Clone
-Team members: Ahsan Tariq, Jarin Thundathil, Marvellous Chukwukelu, Navpreet Singh, Nour Ajami
+Team members: Ahsan Tariq, Jarin Thundathil, Marvellous Chukwukelu, Nour Ajami
 
 
 ## Description
@@ -12,33 +12,97 @@ We are going to be using the Standard Project Layout (This is a Golang standard 
 ```
 559-project/
 ├── cmd/
-│   └── main.go                  # Entry point - wires components, starts the server
+│   ├── main.go
+│   ├── reuse_unix.go
+│   └── reuse_windows.go
 │
 ├── internal/
 │   ├── canvas/
-│   │   └── canvas.go            # Canvas state (2D array, get/set pixel, snapshot)
-│   │
-│   ├── election/
-│   │   └── bully.go             # Modified Bully algorithm, heartbeats (Not implemented yet)
-│   │
+│   │   └── canvas.go
+│   ├── config/
+│   │   └── env.go
+│   ├── models/
+│   │   └── pixels.go
+│   ├── node/
+│   │   ├── election.go
+│   │   ├── heartbeat.go
+│   │   └── node.go
 │   ├── replication/
-│   │   └── replication.go       # Broadcast pixel updates to followers (Not implemented yet)
-│   │
+│   │   └── replication.go
 │   ├── server/
-│   │   ├── http.go              # HTTP handlers (GET /snapshot)
-│   │   └── websocket.go         # WebSocket server (client connections)
-│   │
-│   ├── peer/
-│   │   └── peer.go              # gRPC client/server (replica-to-replica)
-│   │
+│   │   ├── http.go
+│   │   └── websocket.go
 │   └── snapshot/
-│       └── snapshot.go          # Periodic snapshot to disk, recovery in case of failure (not implemented yet)
+│       └── snapshot.go
 │
-├── proto/
-│   └── rplace.proto             # gRPC service definitions 
+├── logs/
 │
+├── scripts/
+│   ├── kill-node.sh
+│   ├── killer.sh
+│   ├── restart-node-demo.sh
+│   ├── restart-node.sh
+│   ├── start-replicas-demo.sh
+│   ├── start-replicas.sh
+│   └── stop-replicas.sh
+│
+├── web/
+│   └── src/
+│       ├── App.css
+│       ├── App.js
+│       ├── components/
+│       │   ├── Canvas.css
+│       │   ├── Canvas.js
+│       │   ├── HUD.css
+│       │   ├── HUD.js
+│       │   ├── Toolbar.css
+│       │   └── Toolbar.js
+│       └── services/
+│           └── canvasService.js
 │
 ├── go.mod
 ├── go.sum
+├── LICENSE
 └── README.md
+
+## Running the System
+
+### Start all replicas
+
+From the project root:
+
+```bash
+./scripts/start-replicas.sh
+```
+
+This launches all replica nodes (including leader election and replication services).
+
+### Start the frontend
+
+In a separate terminal:
+
+```bash
+cd web
+npm install
+npm start
+```
+
+The frontend will be available at:
+
+```text
+http://localhost:3000
+```
+
+### Access a specific replica (optional)
+
+Connect directly to a particular backend replica:
+
+```text
+http://localhost:3000/?server=localhost:8083
+```
+
+### Stop replicas
+
+```bash
+./scripts/stop-replicas.sh
 ```
