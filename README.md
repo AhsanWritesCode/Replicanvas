@@ -65,8 +65,8 @@ We are going to be using the Standard Project Layout (This is a Golang standard 
 ├── LICENSE
 └── README.md
 
-## Running the System
 
+## Running the System
 ### Start all replicas
 
 From the project root:
